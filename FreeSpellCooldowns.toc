@@ -1,0 +1,25 @@
+## Interface: 16001
+## Title: Free Spell Cooldowns
+## Notes: Samostatne ikony cooldownu a sledovani buffu/procu pro WoW Forever.
+## Author: Martin / OpenAI
+## Version: 1.12.0
+## SavedVariablesPerCharacter: FreeSpellCooldownsDB
+
+Fonts.lua
+Core.lua
+Profiles.lua
+ReadyFlash.lua
+Icons.lua
+Range.lua
+Options.lua
+Minimap.lua
+Buffs.lua
+BuffParts.lua
+BuffAlerts.lua
+BuffTimeFade.lua
+BuffSoundSignals.lua
+BuffSounds.lua
+BuffCatalog.lua
+BuffOptions.lua
+SettingsLayout.lua
+SettingsHelp.lua

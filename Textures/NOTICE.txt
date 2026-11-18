@@ -1,0 +1,23 @@
+World of Warcraft UI artwork belongs to Blizzard Entertainment.
+The six BLP files are unmodified native interface resources bundled for
+use in WoW. The TGA files in Parts are derived from those same six BLP
+images, using our own masks to progressively reveal the original artwork.
+They contain cumulative stages and complementary individual pieces for
+the top and side layouts. No artwork from another addon is included.
+
+Maelstrom.blp: file data ID 450927, MD5 dc0c71ea78219038691db812d7798316
+Fire.blp:      file data ID 449490, MD5 1ca808080e85371dbdda2757ad3eee10
+Frost.blp:     file data ID 449489, MD5 98103754b697b4ba9a2969de22aec847
+Nature.blp:    file data ID 450929, MD5 85b36f2d085eaf954cd2ba58adf46651
+PaladinSwords.blp: file data ID 450913, MD5 bbb2d25ce4a607ea7959cd8159a9a231
+PaladinLight.blp:  file data ID 450926, MD5 01c842d8393feba4cbcb6bd6d5e73009
+
+Original content verified against the local WoW Forever 1.60.1.70938 CASC
+content hashes. The addon uses its bundled copies so rendering does not
+depend on legacy TEXTURES/SPELLACTIVATIONOVERLAYS filename resolution.
+The font license in Fonts/OFL.txt applies only to the font.
+
+TimeFeather.tga is an addon-created geometric alpha mask, independent of
+the Blizzard artwork. It feathers the edges of a native duration bar mask.
+The addon references Blizzard's native cooldown-manager SoundKit IDs;
+no audio recordings or extracted sound files are bundled.
