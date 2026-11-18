@@ -1,0 +1,42 @@
+name: Tag CurseForge releases
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.lua'
+      - '**.toc'
+      - 'Fonts/**'
+      - 'Textures/**'
+      - 'README_CS.txt'
+      - '.pkgmeta'
+      - '.github/workflows/tag-curseforge-release.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: curseforge-release
+  cancel-in-progress: false
+
+jobs:
+  tag-release:
+    if: github.repository == 'm4lfixx-netizen/FreeSpellCooldowns' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the addon
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Push the release tag
+        shell: bash
+        run: |
+          version=$(sed -n 's/^## Version: //p' FreeSpellCooldowns.toc | tr -d '\r')
+          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo '::error::Expected an X.Y.Z version in FreeSpellCooldowns.toc.'
+            exit 1
+          fi
+
+          tag="$version-r$GITHUB_RUN_NUMBER"
+          git push origin "$GITHUB_SHA:refs/tags/$tag"
+          printf 'Release tag %s points to %s.\n' "$tag" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
