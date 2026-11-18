@@ -1,4 +1,4 @@
-name: Tag CurseForge releases
+name: Publish to CurseForge
 
 on:
   push:
@@ -9,34 +9,85 @@ on:
       - 'Fonts/**'
       - 'Textures/**'
       - 'README_CS.txt'
-      - '.pkgmeta'
       - '.github/workflows/tag-curseforge-release.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: curseforge-release
   cancel-in-progress: false
 
 jobs:
-  tag-release:
+  publish:
     if: github.repository == 'm4lfixx-netizen/FreeSpellCooldowns' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Check out the addon
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: Push the release tag
+      - name: Build and validate the addon ZIP
+        id: package
         shell: bash
         run: |
-          version=$(sed -n 's/^## Version: //p' FreeSpellCooldowns.toc | tr -d '\r')
-          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo '::error::Expected an X.Y.Z version in FreeSpellCooldowns.toc.'
+          toc=FreeSpellCooldowns_Camelot.toc
+          version=$(sed -n 's/^## Version: //p' "$toc" | tr -d '\r')
+          interface=$(sed -n 's/^## Interface: //p' "$toc" | tr -d '\r')
+          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || ! $interface =~ ^16[0-9]{3}$ ]]; then
+            echo "::error::Expected an X.Y.Z addon version and a WoW Forever interface number in $toc."
             exit 1
           fi
 
-          tag="$version-r$GITHUB_RUN_NUMBER"
-          git push origin "$GITHUB_SHA:refs/tags/$tag"
-          printf 'Release tag %s points to %s.\n' "$tag" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          build="$version-r$GITHUB_RUN_NUMBER"
+          game_version="$((10#$interface / 10000)).$((10#$interface / 100 % 100)).$((10#$interface % 100))"
+          archive="$RUNNER_TEMP/FreeSpellCooldowns-$build.zip"
+          git -c core.autocrlf=false archive --format=zip --prefix=FreeSpellCooldowns/ --output="$archive" "$GITHUB_SHA" \
+            -- '*.lua' '*.toc' Fonts Textures README_CS.txt
+          unzip -tq "$archive"
+
+          {
+            echo "archive=$archive"
+            echo "build=$build"
+            echo "game_version=$game_version"
+          } >> "$GITHUB_OUTPUT"
+          printf 'Verified FreeSpellCooldowns-%s.zip for WoW Forever %s.\n' "$build" "$game_version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish the Release to CurseForge
+        shell: bash
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_PROJECT_ID: '1813268'
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          BUILD: ${{ steps.package.outputs.build }}
+          GAME_VERSION: ${{ steps.package.outputs.game_version }}
+        run: |
+          if [[ -z "$CF_API_TOKEN" ]]; then
+            echo '::error::CurseForge authorization is missing. Set CF_API_TOKEN in the GitHub Actions repository secrets.'
+            exit 1
+          fi
+
+          curseforge_request() {
+            printf 'X-Api-Token: %s\n' "$CF_API_TOKEN" |
+              curl --header @- --fail --silent --show-error --connect-timeout 10 "$@"
+          }
+
+          api=https://wow.curseforge.com/api
+          versions=$(curseforge_request --retry 2 --max-time 30 "$api/game/wow/versions")
+          game_id=$(jq -er --arg version "$GAME_VERSION" \
+            '[.[] | select(.gameVersionTypeID == 88568 and .name == $version) | .id] |
+             if length == 1 then .[0] else error("CurseForge has no unique WoW Forever match for " + $version) end' \
+            <<< "$versions")
+
+          change=$(git show -s --format=%s "$GITHUB_SHA")
+          notes=$(printf '%s\n\nSource: %s/%s/commit/%s' "$change" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA")
+          metadata=$(jq -cn --arg title "Free Spell Cooldowns $BUILD" --arg notes "$notes" --argjson game "$game_id" \
+            '{displayName:$title,changelog:$notes,changelogType:"text",gameVersions:[$game],releaseType:"release"}')
+
+          response=$(curseforge_request --max-time 120 --form-string "metadata=$metadata" \
+            --form "file=@$ARCHIVE;type=application/zip" "$api/projects/$CF_PROJECT_ID/upload-file")
+          file_id=$(jq -er '.id | select(type == "number" and . > 0)' <<< "$response")
+          printf 'CurseForge accepted file %s for project %s (WoW Forever %s).\n' "$file_id" "$CF_PROJECT_ID" | tee -a "$GITHUB_STEP_SUMMARY"
