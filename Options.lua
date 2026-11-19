@@ -20,8 +20,38 @@ local function Button(parent, text, x, y, width, callback)
     return button
 end
 
+local function RepeatStepWhileHeld(button, callback)
+    local initialDelay, interval = 0.35, 0.08
+    local function Stop(self) self:SetScript("OnUpdate", nil) end
+
+    button:RegisterForClicks("LeftButtonDown")
+    if button.RegisterForMouse then button:RegisterForMouse("LeftButtonDown", "LeftButtonUp") end
+    button:SetScript("OnClick", function() callback(1) end)
+    button:SetScript("OnMouseDown", function(self, mouseButton)
+        if mouseButton ~= "LeftButton" or not self:IsEnabled() then return end
+        local uid, profile = FSC.selectedUID, FSC.activeProfileKey
+        local remaining = initialDelay
+        self:SetScript("OnUpdate", function(self, elapsed)
+            if not self:IsEnabled() or FSC.inCombat
+                or FSC.selectedUID ~= uid or FSC.activeProfileKey ~= profile then
+                Stop(self)
+                return
+            end
+            remaining = remaining - elapsed
+            if remaining <= 0 then
+                local steps = math.floor(-remaining / interval) + 1
+                remaining = remaining + steps * interval
+                callback(steps)
+            end
+        end)
+    end)
+    for _, event in ipairs({"OnMouseUp", "OnLeave", "OnHide", "OnDisable"}) do
+        button:HookScript(event, Stop)
+    end
+end
+
 -- Draw +/- directly so these controls never depend on legacy button artwork.
-local function StepButton(parent, x, y, positive, callback)
+local function StepButton(parent, x, y, positive, callback, repeatWhenHeld)
     local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
     button:SetSize(24, 24)
     button:SetPoint("TOPLEFT", x, y)
@@ -50,7 +80,8 @@ local function StepButton(parent, x, y, positive, callback)
     end
     button:SetScript("OnEnable", function() Paint(true) end)
     button:SetScript("OnDisable", function() Paint(false) end)
-    button:SetScript("OnClick", callback)
+    if repeatWhenHeld then RepeatStepWhileHeld(button, callback)
+    else button:SetScript("OnClick", callback) end
     return button
 end
 
@@ -131,7 +162,7 @@ local function NumericBox(parent, x, y, width, apply)
                 apply(entry, value)
                 FSC:ApplyIcon(entry)
             else
-                FSC:Status("Zadej platné číslo a potvrď Enterem.", true)
+                FSC:Status(FSC:T("Zadej platné číslo a potvrď Enterem."), true)
             end
         end
         FSC:RefreshOptions()
@@ -142,7 +173,7 @@ end
 function FSC:ClearInputFocus()
     if not self.window then return end
     for _, edit in ipairs({ self.window.input, self.window.xInput,
-        self.window.yInput }) do edit:ClearFocus() end
+        self.window.yInput, self.window.sizeInput }) do edit:ClearFocus() end
 end
 
 local function SyncNumber(edit, value)
@@ -177,9 +208,9 @@ end
 function FSC:RefreshOptions()
     local window = self.window
     if not window then return end
-    window.profileStatus:SetText("Aktivní: " .. self:GetSpecLabel() .. "  |  Vzhled a poloha níže platí pro tento spec.")
-    window.lockButton:SetText(self.db.locked and "Odemknout ikony" or "Zamknout ikony")
-    window.listTitle:SetText("Kouzla (" .. #self.db.icons .. ") - společný seznam pro oba specy")
+    window.profileStatus:SetText(FSC:T("Aktivní: ") .. self:GetSpecLabel() .. FSC:T("  |  Vzhled a poloha níže platí pro tento spec."))
+    window.lockButton:SetText(self.db.locked and FSC:T("Odemknout ikony") or FSC:T("Zamknout ikony"))
+    window.listTitle:SetText(FSC:T("Kouzla (") .. #self.db.icons .. FSC:T(") - společný seznam pro oba specy"))
     if not self.selectedUID or not self:FindEntry(self.selectedUID) then
         self.selectedUID = self.db.icons[1] and self.db.icons[1].uid
     end
@@ -203,7 +234,7 @@ function FSC:RefreshOptions()
             row.name:SetPoint("LEFT", 42, 0)
             row.name:SetWidth(184)
             row.name:SetJustifyH("LEFT")
-            row.remove = Button(row, "×", 238, -5, 28, function()
+            row.remove = Button(row, FSC:T("×"), 238, -5, 28, function()
                 FSC:RemoveSpell(row.uid)
             end)
             row:SetScript("OnClick", function()
@@ -223,12 +254,16 @@ function FSC:RefreshOptions()
     end
     for index = #self.db.icons + 1, #rows do rows[index]:Hide() end
     local entry = self.selectedUID and self:FindEntry(self.selectedUID)
-    window.selected:SetText(entry and ("Vybraná ikona: " .. entry.name) or "Nejdřív přidej kouzlo")
-    window.sizeValue:SetText(entry and (entry.size .. " px") or "—")
+    window.selected:SetText(entry and (FSC:T("Vybraná ikona: ") .. entry.name) or FSC:T("Nejdřív přidej kouzlo"))
+    SyncNumber(window.sizeInput, entry and math.floor(entry.size + 0.5))
     window.numbers:SetChecked(entry and entry.showNumbers or false)
     window.spellName:SetChecked(entry and entry.showName or false)
     window.combatOnly:SetChecked(entry and entry.combatOnly or false)
-    window.flashReady:SetChecked(entry and entry.flashReady or false)
+    local flashOnly = entry and entry.flashOnly
+    local flashEnabled = entry ~= nil and (entry.flashReady or flashOnly)
+    window.flashOnly:SetChecked(flashOnly == true)
+    window.flashReady:SetChecked(flashEnabled == true)
+    window.flashOutsideCombat:SetChecked(entry and entry.flashOutsideCombat or false)
     window.manaTint:SetChecked(entry and entry.manaTint or false)
     local intensity = entry and self:GetFlashIntensity(entry) or 80
     window.flashIntensitySlider.syncing = true
@@ -237,8 +272,8 @@ function FSC:RefreshOptions()
     window.flashIntensityValue:SetText(entry and (intensity .. " %") or "-")
     window.spec1:SetChecked(entry and self:IsEntryAssigned(entry, 1) or false)
     window.spec2:SetChecked(entry and self:IsEntryAssigned(entry, 2) or false)
-    window.spec1.label:SetText("Spec 1" .. (self.activeSpec == 1 and " (aktivní)" or ""))
-    window.spec2.label:SetText("Spec 2" .. (self.activeSpec == 2 and " (aktivní)" or ""))
+    window.spec1.label:SetText("Spec 1" .. (self.activeSpec == 1 and FSC:T(" (aktivní)") or ""))
+    window.spec2.label:SetText("Spec 2" .. (self.activeSpec == 2 and FSC:T(" (aktivní)") or ""))
     local transparency = entry and math.floor((1 - entry.opacity) * 100 + 0.5) or 0
     window.opacitySlider.syncing = true
     window.opacitySlider:SetValue(transparency)
@@ -247,6 +282,16 @@ function FSC:RefreshOptions()
     SyncNumber(window.xInput, entry and math.floor(entry.x + 0.5))
     SyncNumber(window.yInput, entry and math.floor(entry.y + 0.5))
     for _, control in ipairs(window.entryControls) do control:SetEnabled(entry ~= nil) end
+    local drawIcon = entry ~= nil and not flashOnly
+    for _, control in ipairs({window.numbers, window.spellName,
+        window.combatOnly, window.manaTint, window.flashReady}) do
+        control:SetEnabled(drawIcon)
+    end
+    window.flashOutsideCombat:SetEnabled(flashEnabled == true)
+    if window.cooldownDisplayHint then
+        window.cooldownDisplayHint:SetText(flashOnly and FSC:T("Odemkni ikonu ve Vzhledu ikony, pokud ji chceš přetáhnout.")
+            or FSC:T("Mimo dosah cíle je ikona červená."))
+    end
 end
 
 function FSC:CreateOptions()
@@ -272,7 +317,7 @@ function FSC:CreateOptions()
     close:SetPoint("TOPRIGHT", -3, -3)
     Label(window, "Free Spell Cooldowns", 20, -19, "GameFontNormalLarge")
     self:AttachCategoryTabs(window, "cooldowns")
-    Label(window, "Každé kouzlo má vlastní ikonu, velikost a místo na obrazovce.", 20, -48, "GameFontHighlightSmall")
+    Label(window, FSC:T("Každé kouzlo má vlastní ikonu, velikost a místo na obrazovce."), 20, -48, "GameFontHighlightSmall")
     window.profileStatus = Label(window, "", 20, -70, "GameFontNormalSmall")
     window.profileStatus:SetWidth(510)
 
@@ -288,16 +333,16 @@ function FSC:CreateOptions()
     window.dropLabel = dropLabel
     self:SetCzechFont(dropLabel)
     dropLabel:SetPoint("CENTER", 0, 8)
-    dropLabel:SetText("PŘETÁHNI SEM KOUZLO ZE SPELLBOOKU")
+    dropLabel:SetText(FSC:T("PŘETÁHNI SEM KOUZLO ZE SPELLBOOKU"))
     local dropHint = drop:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     window.dropHint = dropHint
     self:SetCzechFont(dropHint)
     dropHint:SetPoint("CENTER", 0, -13)
-    dropHint:SetText("Spellbook otevřeš klávesou P. Přidávej přímo kouzla.")
+    dropHint:SetText(FSC:T("Spellbook otevřeš klávesou P. Přidávej přímo kouzla."))
     drop:SetScript("OnReceiveDrag", function() FSC:AddFromCursor() end)
     drop:SetScript("OnClick", function() FSC:AddFromCursor() end)
 
-    window.inputLabel = Label(window, "Nebo napiš název kouzla ze hry / spell ID:", 20, -179, "GameFontHighlightSmall")
+    window.inputLabel = Label(window, FSC:T("Nebo napiš název kouzla ze hry / spell ID:"), 20, -179, "GameFontHighlightSmall")
     window.input = EditBox(window, 25, -199, 385)
     local function Submit()
         if FSC:AddSpell(window.input:GetText()) then
@@ -306,8 +351,8 @@ function FSC:CreateOptions()
         end
     end
     window.input:SetScript("OnEnterPressed", Submit)
-    window.addButton = Button(window, "Přidat", 425, -200, 110, Submit)
-    window.status = Label(window, "Začni přidáním kouzla. Potom odemkni ikony a rozmísti je.", 20, -238, "GameFontHighlightSmall")
+    window.addButton = Button(window, FSC:T("Přidat"), 425, -200, 110, Submit)
+    window.status = Label(window, FSC:T("Začni přidáním kouzla. Potom odemkni ikony a rozmísti je."), 20, -238, "GameFontHighlightSmall")
     window.status:SetWidth(515)
     window.status:SetHeight(28)
     window.status:SetJustifyV("TOP")
@@ -320,38 +365,42 @@ function FSC:CreateOptions()
     window.content = CreateFrame("Frame", nil, scroll)
     window.content:SetSize(490, 1)
     scroll:SetScrollChild(window.content)
-    window.empty = Label(window.content, "Zatím nesleduješ žádná kouzla.", 8, -12, "GameFontDisable")
+    window.empty = Label(window.content, FSC:T("Zatím nesleduješ žádná kouzla."), 8, -12, "GameFontDisable")
 
     window.selected = Label(window, "", 20, -478, "GameFontNormal")
     window.selected:SetWidth(510)
-    window.specLabel = Label(window, "Zobrazovat ve:", 20, -515, "GameFontHighlightSmall")
+    window.specLabel = Label(window, FSC:T("Zobrazovat ve:"), 20, -515, "GameFontHighlightSmall")
     local function ToggleSpec(slot, check)
         local entry = FSC:FindEntry(FSC.selectedUID)
         if not FSC:SetEntrySpec(entry, slot, check:GetChecked() == true) then FSC:RefreshOptions() end
     end
     window.spec1 = CheckBox(window, "Spec 1", 173, -503, function(check) ToggleSpec(1, check) end)
     window.spec2 = CheckBox(window, "Spec 2", 340, -503, function(check) ToggleSpec(2, check) end)
-    window.sizeLabel = Label(window, "Velikost:", 20, -557, "GameFontHighlightSmall")
-    local minus = StepButton(window, 85, -549, false, function() AdjustSize(-1) end)
-    window.sizeValue = Label(window, "", 127, -557, "GameFontHighlightSmall")
-    local plus = StepButton(window, 185, -549, true, function() AdjustSize(1) end)
+    window.sizeLabel = Label(window, FSC:T("Velikost:"), 20, -557, "GameFontHighlightSmall")
+    local minus = StepButton(window, 85, -549, false, function(steps) AdjustSize(-steps) end, true)
+    window.sizeInput = NumericBox(window, 127, -549, 64, function(entry, value)
+        entry.size = FSC:ClampIconSize(value)
+    end)
+    window.sizeInput:SetJustifyH("CENTER")
+    local plus = StepButton(window, 200, -549, true, function(steps) AdjustSize(steps) end, true)
+    window.sizeUnit = Label(window, "px", 236, -557, "GameFontHighlightSmall")
     window.sizeLess, window.sizeMore = minus, plus
-    window.numbers = CheckBox(window, "Číselný odpočet", 270, -545, function(self)
+    window.numbers = CheckBox(window, FSC:T("Číselný odpočet"), 270, -545, function(self)
         if not FSC:CanEdit() then return end
         local entry = FSC:FindEntry(FSC.selectedUID)
         if entry then entry.showNumbers = self:GetChecked() == true; FSC:ApplyIcon(entry) end
     end)
-    window.spellName = CheckBox(window, "Název pod ikonou", 270, -580, function(self)
+    window.spellName = CheckBox(window, FSC:T("Název pod ikonou"), 270, -580, function(self)
         if not FSC:CanEdit() then return end
         local entry = FSC:FindEntry(FSC.selectedUID)
         if entry then entry.showName = self:GetChecked() == true; FSC:ApplyIcon(entry) end
     end)
-    window.combatOnly = CheckBox(window, "Pouze v boji", 270, -615, function(self)
+    window.combatOnly = CheckBox(window, FSC:T("Pouze v boji"), 270, -615, function(self)
         if not FSC:CanEdit() then return end
         local entry = FSC:FindEntry(FSC.selectedUID)
         if entry then entry.combatOnly = self:GetChecked() == true; FSC:ApplyIcon(entry) end
     end)
-    window.opacityLabel = Label(window, "Průhlednost:", 20, -594, "GameFontHighlightSmall")
+    window.opacityLabel = Label(window, FSC:T("Průhlednost:"), 20, -594, "GameFontHighlightSmall")
     local opacity = PercentSlider(window, 103, -590, 104)
     window.opacitySlider = opacity
     window.opacityValue = Label(window, "", 215, -594, "GameFontHighlightSmall")
@@ -395,22 +444,29 @@ function FSC:CreateOptions()
     end)
     local yPlus = StepButton(window, 418, -651, true, function() AdjustPosition("y", 1) end)
     window.xLess, window.xMore, window.yLess, window.yMore = xMinus, xPlus, yMinus, yPlus
-    window.flashReady = CheckBox(window, "Probliknout po CD (jen v boji)", 20, -684, function(check)
+    local function SetAlertOption(field, check)
         if not FSC:CanEdit() then FSC:RefreshOptions(); return end
         local entry = FSC:FindEntry(FSC.selectedUID)
-        if entry then entry.flashReady = check:GetChecked() == true; FSC:ApplyIcon(entry) end
+        if not entry then return end
+        entry[field] = check:GetChecked() == true
+        FSC:ApplyIcon(entry)
+        FSC:RefreshOptions()
+    end
+    window.flashOnly = CheckBox(window, FSC:T("Jen probliknutí po nabití cooldownu"), 20, -670, function(check)
+        SetAlertOption("flashOnly", check)
     end)
-    window.flashTest = Button(window, "Vyzkoušet probliknutí", 380, -721, 155, function()
-        if not FSC:CanEdit() then return end
-        local entry = FSC:FindEntry(FSC.selectedUID)
-        if entry then FSC:PlayReadyFlash(entry, true) end
+    window.flashReady = CheckBox(window, FSC:T("Probliknout po cooldownu"), 20, -684, function(check)
+        SetAlertOption("flashReady", check)
     end)
-    window.manaTint = CheckBox(window, "Modře při nedostatku many", 270, -684, function(check)
+    window.flashOutsideCombat = CheckBox(window, FSC:T("Probliknout i mimo boj"), 270, -684, function(check)
+        SetAlertOption("flashOutsideCombat", check)
+    end)
+    window.manaTint = CheckBox(window, FSC:T("Modře při nedostatku many"), 270, -684, function(check)
         if not FSC:CanEdit() then FSC:RefreshOptions(); return end
         local entry = FSC:FindEntry(FSC.selectedUID)
         if entry then entry.manaTint = check:GetChecked() == true; FSC:ApplyIcon(entry) end
     end)
-    window.flashIntensityLabel = Label(window, "Intenzita záblesku:", 20, -729, "GameFontHighlightSmall")
+    window.flashIntensityLabel = Label(window, FSC:T("Intenzita záblesku:"), 20, -729, "GameFontHighlightSmall")
     local intensity = PercentSlider(window, 150, -725, 155)
     window.flashIntensitySlider = intensity
     window.flashIntensityValue = Label(window, "", 313, -729, "GameFontHighlightSmall")
@@ -440,22 +496,22 @@ function FSC:CreateOptions()
     intensity:SetScript("OnMouseWheel", function(self, delta)
         if self:IsEnabled() then self:SetValue(FSC:Clamp(self:GetValue() + delta, 0, 100)) end
     end)
-    window.opacityHint = Label(window, "Průhlednost: 0 % = plná ikona, 100 % = neviditelná.", 20, -773, "GameFontHighlightSmall")
-    window.coordinatesHint = Label(window, "X/Y: pixely od středu. Tlačítka - / + mění polohu po 1 px.", 20, -791, "GameFontHighlightSmall")
-    local center = Button(window, "Přesunout na střed", 20, -816, 195, function()
+    window.opacityHint = Label(window, FSC:T("Průhlednost platí pro běžnou ikonu i ikonu při záblesku."), 20, -773, "GameFontHighlightSmall")
+    window.coordinatesHint = Label(window, FSC:T("X/Y: pixely od středu. Tlačítka - / + mění polohu po 1 px."), 20, -791, "GameFontHighlightSmall")
+    local center = Button(window, FSC:T("Přesunout na střed"), 20, -816, 195, function()
         if not FSC:CanEdit() then return end
         local entry = FSC:FindEntry(FSC.selectedUID)
         if entry then entry.x = 0; entry.y = 0; FSC:ApplyIcon(entry); FSC:RefreshOptions() end
     end)
     window.centerButton = center
-    window.entryControls = { minus, plus, center, window.numbers, window.spellName,
+    window.entryControls = { minus, plus, window.sizeInput, center, window.numbers, window.spellName,
         window.combatOnly, window.opacitySlider, window.xInput, window.yInput,
-        xMinus, xPlus, yMinus, yPlus, window.spec1, window.spec2, window.flashReady, window.flashTest,
+        xMinus, xPlus, yMinus, yPlus, window.spec1, window.spec2, window.flashOnly,
         window.manaTint, window.flashIntensitySlider }
     window.lockButton = Button(window, "", 20, -867, 195, function()
         FSC:SetLocked(not FSC.db.locked)
     end)
-    local hint = Label(window, "Přetažení: poloha · Shift + kolečko: velikost\nPravé tlačítko na odemčené ikoně: nastavení", 235, -863, "GameFontHighlightSmall")
+    local hint = Label(window, FSC:T("Přetažení: poloha · Shift + kolečko: velikost\nPravé tlačítko na odemčené ikoně: nastavení"), 235, -863, "GameFontHighlightSmall")
     window.moveHint = hint
     hint:SetWidth(305)
     hint:SetHeight(34)

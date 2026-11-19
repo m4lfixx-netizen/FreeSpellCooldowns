@@ -74,7 +74,7 @@ function FSC:CreateBuffTimeGate(layout, group, frame, candidates)
                 interpolation = Enum.StatusBarInterpolation.Immediate})
         end,
     })
-    if not ok then frame.nativeError = "Časový práh se nepodařilo připravit: " .. tostring(err); group.failed = true end
+    if not ok then frame.nativeError = FSC:T("Časový práh se nepodařilo připravit: ") .. tostring(err); group.failed = true end
     return gate
 end
 

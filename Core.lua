@@ -1,6 +1,6 @@
 local addonName, FSC = ...
 FSC.name = addonName
-FSC.version = "1.12.0"
+FSC.version = "1.16.2"
 FSC.frames = {}
 FSC.pendingSpells = {}
 FSC.requestedSpellData = {}
@@ -24,7 +24,7 @@ end
 
 function FSC:CanEdit()
     if InCombatLockdown() then
-        self:Status("Nastavení ikon uprav až po skončení boje.", true)
+        self:Status(FSC:T("Nastavení ikon uprav až po skončení boje."), true)
         return false
     end
     return true
@@ -91,7 +91,7 @@ function FSC:AddSpell(identifier, fromLoad)
     if not self:CanEdit() then return false end
     local text = tostring(identifier or ""):match("^%s*(.-)%s*$")
     if text == "" then
-        self:Status("Napiš název kouzla nebo ho přetáhni ze spellbooku.", true)
+        self:Status(FSC:T("Napiš název kouzla nebo ho přetáhni ze spellbooku."), true)
         return false
     end
     local linkID = text:match("spell:(%d+)")
@@ -102,9 +102,9 @@ function FSC:AddSpell(identifier, fromLoad)
             and not fromLoad and C_Spell.RequestLoadSpellData then
             self.pendingSpells[identifier] = true
             C_Spell.RequestLoadSpellData(identifier)
-            self:Status("Načítám údaje o kouzlu…")
+            self:Status(FSC:T("Načítám údaje o kouzlu…"))
         else
-            self:Status("Kouzlo nenalezeno. Použij název ze hry, spell ID nebo přetažení.", true)
+            self:Status(FSC:T("Kouzlo nenalezeno. Použij název ze hry, spell ID nebo přetažení."), true)
         end
         return false
     end
@@ -113,7 +113,7 @@ function FSC:AddSpell(identifier, fromLoad)
         if entry.spellID == spellID then
             self.selectedUID = entry.uid
             self:RefreshOptions()
-            self:Status("Toto kouzlo už sleduješ: " .. entry.name)
+            self:Status(FSC:T("Toto kouzlo už sleduješ: ") .. entry.name)
             return true
         end
     end
@@ -131,6 +131,8 @@ function FSC:AddSpell(identifier, fromLoad)
         opacity = 1,
         combatOnly = false,
         flashReady = false,
+        flashOnly = false,
+        flashOutsideCombat = false,
         flashIntensity = 80,
         manaTint = false,
         specs = { [self.activeSpec or 1] = true },
@@ -144,7 +146,7 @@ function FSC:AddSpell(identifier, fromLoad)
     self.selectedUID = entry.uid
     self:RefreshOptions()
     self:QueueUpdate()
-    self:Status("Přidáno: " .. entry.name .. ". Polohu změníš po odemčení ikon.")
+    self:Status(FSC:T("Přidáno: ") .. entry.name .. FSC:T(". Polohu změníš po odemčení ikon."))
     return true
 end
 
@@ -153,7 +155,7 @@ function FSC:AddFromCursor()
     local kind, slot, bank, spellID = GetCursorInfo()
     -- Modern spell cursors put the spell ID in the FOURTH return value.
     if kind ~= "spell" then
-        self:Status("Sem přetáhni přímo kouzlo ze spellbooku (klávesa P).", true)
+        self:Status(FSC:T("Sem přetáhni přímo kouzlo ze spellbooku (klávesa P)."), true)
         return false
     end
     if not spellID and C_SpellBook and C_SpellBook.GetSpellBookItemInfo then
@@ -163,7 +165,7 @@ function FSC:AddFromCursor()
         spellID = item and item.spellID
     end
     if not spellID then
-        self:Status("Z přetaženého kouzla nelze získat spell ID.", true)
+        self:Status(FSC:T("Z přetaženého kouzla nelze získat spell ID."), true)
         return false
     end
     local added = self:AddSpell(spellID)
@@ -186,7 +188,7 @@ function FSC:RemoveSpell(uid)
     self.selectedUID = self.db.icons[index] and self.db.icons[index].uid
         or (self.db.icons[1] and self.db.icons[1].uid)
     self:RefreshOptions()
-    self:Status("Odebráno: " .. entry.name)
+    self:Status(FSC:T("Odebráno: ") .. entry.name)
 end
 
 function FSC:SetLocked(locked)
@@ -195,16 +197,17 @@ function FSC:SetLocked(locked)
     self:SaveActiveSpecSettings()
     self:UpdateInteraction()
     self:RefreshOptions()
-    self:Status(locked and "Ikony uzamčeny. Nastavení otevřeš příkazem /fsc."
-        or "Ikony odemčeny. Přetáhni každou na požadované místo.")
+    self:Status(locked and FSC:T("Ikony uzamčeny. Nastavení otevřeš příkazem /fsc.")
+        or FSC:T("Ikony odemčeny. Přetáhni každou na požadované místo."))
 end
 
 function FSC:Initialize()
     if not (C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellCooldownDuration) then
-        self:Print("Tato verze addonu vyžaduje WoW Forever 1.60.1 a jeho moderní API.")
+        self:Print(FSC:T("Tato verze addonu vyžaduje WoW Forever 1.60.1 a jeho moderní API."))
         return
     end
     if type(FreeSpellCooldownsDB) ~= "table" then FreeSpellCooldownsDB = {} end
+    self.inCombat = not not InCombatLockdown()
     self:InitializeProfiles()
     local db = self.db
     self:CreateOptions()
@@ -213,8 +216,14 @@ function FSC:Initialize()
     self:InitializeBuffs()
     self:UpdateInteraction()
     self:QueueUpdate()
-    self:Print("Načteno. /fsc otevře správu samostatných ikon.")
-    if not self.storage.introSeen then
+    self:Print(FSC:T("Načteno. /fsc otevře správu samostatných ikon."))
+    local restore = self.storage.languageReloadSelection
+    self.storage.languageReloadSelection = nil
+    if type(restore) == "table" then
+        self.selectedUID = restore.cooldown
+        self.selectedBuffUID = restore.buff
+    end
+    if not self.storage.introSeen or type(restore) == "table" then
         self.storage.introSeen = true
         self:OpenOptions()
     end
@@ -235,9 +244,12 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     elseif not FSC.db then
         return
     elseif event == "PLAYER_REGEN_DISABLED" then
+        -- The game enters lockdown after dispatching this event.
+        FSC.inCombat = true
         FSC:UpdateInteraction()
         if FSC.window then FSC.window:Hide() end
     elseif event == "PLAYER_REGEN_ENABLED" then
+        FSC.inCombat = false
         FSC:CheckTalentProfile()
         FSC:UpdateInteraction()
         if refreshSpellsAfterCombat then
@@ -262,7 +274,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
         if FSC.pendingSpells[spellID] and not InCombatLockdown() then
             FSC.pendingSpells[spellID] = nil
             if success then FSC:AddSpell(spellID, true)
-            else FSC:Status("Kouzlo s tímto ID se nepodařilo načíst.", true) end
+            else FSC:Status(FSC:T("Kouzlo s tímto ID se nepodařilo načíst."), true) end
         end
         FSC:RefreshAllSpells()
         FSC:QueueUpdate()
@@ -279,7 +291,7 @@ SLASH_FREESPELLCOOLDOWNS1 = "/fsc"
 SLASH_FREESPELLCOOLDOWNS2 = "/cdikony"
 SlashCmdList.FREESPELLCOOLDOWNS = function(message)
     if not FSC.db then
-        FSC:Print("Addon není připraven. Podporovaný klient: WoW Forever 1.60.1.")
+        FSC:Print(FSC:T("Addon není připraven. Podporovaný klient: WoW Forever 1.60.1."))
         return
     end
     local command, rest = (message or ""):match("^%s*(%S*)%s*(.-)%s*$")
@@ -290,6 +302,6 @@ SlashCmdList.FREESPELLCOOLDOWNS = function(message)
     elseif command == "lock" then FSC:SetCurrentLocked(true)
     elseif command == "unlock" then FSC:SetCurrentLocked(false)
     elseif command == "help" then
-        FSC:Print("/fsc — nastavení | /fsc add Stormstrike — přidat | /fsc buff — buffy/procy | /fsc lock — zamknout | /fsc unlock — odemknout")
+        FSC:Print(FSC:T("/fsc — nastavení | /fsc add Stormstrike — přidat | /fsc buff — buffy/procy | /fsc lock — zamknout | /fsc unlock — odemknout"))
     else FSC:OpenOptions() end
 end

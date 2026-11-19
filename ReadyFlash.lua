@@ -2,6 +2,12 @@ local _, FSC = ...
 
 local readyColor = CreateColor(1, 0.9, 0.45, 1)
 local hiddenColor = CreateColor(1, 0.9, 0.45, 0)
+local iconColor = CreateColor(1, 1, 1, 1)
+local hiddenIconColor = CreateColor(1, 1, 1, 0)
+
+function FSC:ShouldFlashOnReady(entry, inCombat)
+    return (entry.flashReady or entry.flashOnly) and (inCombat or entry.flashOutsideCombat)
+end
 
 function FSC:GetFlashIntensity(entry)
     local value = tonumber(entry.flashIntensity)
@@ -9,21 +15,17 @@ function FSC:GetFlashIntensity(entry)
     return self:Clamp(math.floor(value + 0.5), 0, 100)
 end
 
-function FSC:StopReadyFlash(entry, suppressRestore)
-    local frame = self.frames[entry.uid]
-    local flash = frame and frame.readyFlash
+function FSC:StopReadyFlashEffect(frame)
+    local flash = frame.readyFlash
     if not flash then return end
-    local preview = flash.preview
-    flash.preview = nil
     flash.animation:Stop()
     flash:Hide()
     flash:SetAlpha(0)
-    frame.readyFlashStrength.previewIcon:Hide()
-    frame.readyFlashStrength:SetFrameStrata("MEDIUM")
-    if preview then
-        frame:SetAlpha(entry.opacity or 1)
-        if not suppressRestore then self:ApplyVisibility(entry) end
-    end
+end
+
+function FSC:StopReadyFlash(entry)
+    local frame = self.frames[entry.uid]
+    if frame then self:StopReadyFlashEffect(frame) end
 end
 
 function FSC:StopAllReadyFlashes()
@@ -34,19 +36,13 @@ end
 function FSC:SyncReadyFlash(entry)
     local frame = self.frames[entry.uid]
     local flash = frame and frame.readyFlash
-    if frame and frame.readyFlashStrength then
-        frame.readyFlashStrength:SetAlpha(self:GetFlashIntensity(entry) / 100)
-    end
-    if flash and not flash.preview and (not entry.flashReady or not InCombatLockdown()
+    if flash then flash.glow:SetAlpha(self:GetFlashIntensity(entry) / 100) end
+    if flash and (not self:ShouldFlashOnReady(entry, self.inCombat)
         or not self:IsEntryAssigned(entry)) then self:StopReadyFlash(entry) end
 end
 
-local function SetUsabilityColor(entry, flash, preview)
-    local ok, usable
-    if not preview and C_Spell.IsSpellUsable then
-        ok, usable = pcall(C_Spell.IsSpellUsable, entry.activeSpellID or entry.spellID)
-    end
-    local nativeBoolean = ok and ((issecretvalue and issecretvalue(usable)) or type(usable) == "boolean")
+local function SetUsabilityColor(flash, usable)
+    local nativeBoolean = (issecretvalue and issecretvalue(usable)) or type(usable) == "boolean"
     for _, texture in ipairs(flash.regions) do
         if nativeBoolean then
             -- The renderer can consume even a restricted boolean. Never branch on its value.
@@ -57,37 +53,53 @@ local function SetUsabilityColor(entry, flash, preview)
     end
 end
 
-function FSC:PlayReadyFlash(entry, preview)
-    local frame = entry and self.frames[entry.uid]
-    local flash = frame and frame.readyFlash
-    if not flash then return false end
+function FSC:PlayCooldownReadyVisual(frame, entry, usable)
     local intensity = self:GetFlashIntensity(entry)
     if intensity == 0 then return false end
-    if not preview and (not entry.flashReady or not InCombatLockdown()
-        or not self:IsEntryAssigned(entry) or not frame:IsShown()) then return false end
-    local now = GetTime()
-    if not preview and frame.lastReadyFlashAt and now - frame.lastReadyFlashAt < 0.2 then return false end
-    self:StopReadyFlash(entry)
-    frame.readyFlashStrength:SetAlpha(intensity / 100)
-    flash.preview = preview == true
-    if preview then
-        frame.readyFlashStrength:SetFrameStrata("TOOLTIP")
-        frame.readyFlashStrength.previewIcon:SetTexture(entry.iconID or 134400)
-        frame.readyFlashStrength.previewIcon:Show()
-        frame:SetAlpha(1)
-        frame:Show()
-    else frame.lastReadyFlashAt = now end
-    SetUsabilityColor(entry, flash, preview)
-    flash:SetAlpha(0)
+    local iconTexture
+    if entry.flashOnly or not frame.fscDrawIcon then iconTexture = entry.iconID or 134400 end
+    if entry.flashOnly then usable = nil end
+    self:StopReadyFlashEffect(frame)
+    local flash = frame.readyFlash
+    flash.glow:SetAlpha(intensity / 100)
+    flash.icon:SetShown(iconTexture ~= nil)
+    if iconTexture then
+        flash.icon:SetTexture(iconTexture)
+        flash.icon:SetAlpha(entry.opacity or 1)
+        if (issecretvalue and issecretvalue(usable)) or type(usable) == "boolean" then
+            flash.icon:SetVertexColorFromBoolean(usable, iconColor, hiddenIconColor)
+        else
+            flash.icon:SetVertexColor(1, 1, 1, 1)
+        end
+    end
+    flash.fill:SetColorTexture(1, 1, 1, iconTexture and 0.28 or 0.65)
+    SetUsabilityColor(flash, usable)
     flash:Show()
     flash.animation:Play()
     return true
 end
 
+function FSC:PlayReadyFlash(entry)
+    local frame = entry and self.frames[entry.uid]
+    if not frame or not frame.readyFlash or not self:ShouldFlashOnReady(entry, self.inCombat)
+        or not self:IsEntryAssigned(entry) or not frame:IsShown() then return false end
+    local intensity = self:GetFlashIntensity(entry)
+    if intensity == 0 then return false end
+    local now = GetTime()
+    if frame.lastReadyFlashAt and now - frame.lastReadyFlashAt < 0.2 then return false end
+    frame.lastReadyFlashAt = now
+    local usable
+    if not entry.flashOnly and C_Spell.IsSpellUsable then
+        local ok, value = pcall(C_Spell.IsSpellUsable, entry.activeSpellID or entry.spellID)
+        if ok then usable = value end
+    end
+    return self:PlayCooldownReadyVisual(frame, entry, usable)
+end
+
 function FSC:OnCooldownReady(entry, cooldown)
     if cooldown.fscUpdating or cooldown.fscProfileKey ~= self.activeProfileKey
         or cooldown.fscSpellID ~= (entry.activeSpellID or entry.spellID)
-        or not InCombatLockdown() or not entry.flashReady or not self:IsEntryAssigned(entry) then return end
+        or not self:ShouldFlashOnReady(entry, self.inCombat) or not self:IsEntryAssigned(entry) then return end
     local frame, profile, spellID = self.frames[entry.uid], self.activeProfileKey, cooldown.fscSpellID
     if not frame or not frame:IsShown() then return end
     -- Let spell usability settle after the native timer finishes. Do not read cooldown times.
@@ -97,33 +109,33 @@ function FSC:OnCooldownReady(entry, cooldown)
     end)
 end
 
-function FSC:CreateReadyFlash(entry)
-    local frame = self.frames[entry.uid]
-    -- Keep notification strength independent of the icon's configured opacity.
-    local strength = CreateFrame("Frame", nil, UIParent)
-    frame.readyFlashStrength = strength
-    strength:SetAllPoints(frame)
-    strength:SetFrameStrata("MEDIUM")
-    strength:SetFrameLevel(frame:GetFrameLevel() + 6)
-    strength:EnableMouse(false)
-    strength:SetAlpha(self:GetFlashIntensity(entry) / 100)
-    strength.previewIcon = strength:CreateTexture(nil, "BACKGROUND")
-    strength.previewIcon:SetAllPoints()
-    strength.previewIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    strength.previewIcon:Hide()
-    local flash = CreateFrame("Frame", nil, strength)
+function FSC:CreateReadyFlashEffect(frame, parent, onFinished)
+    -- The flash is a sibling of the tracked icon so it can show when that icon is hidden.
+    local layer = CreateFrame("Frame", nil, parent)
+    frame.readyFlashLayer = layer
+    layer:SetAllPoints(frame)
+    layer:SetFrameStrata(frame:GetFrameStrata())
+    layer:SetFrameLevel(frame:GetFrameLevel() + 6)
+    layer:EnableMouse(false)
+    local flash = CreateFrame("Frame", nil, layer)
     frame.readyFlash = flash
     flash:SetAllPoints(frame)
     flash:EnableMouse(false)
     flash:SetAlpha(0)
     flash:Hide()
     flash.regions = {}
-    local fill = flash:CreateTexture(nil, "ARTWORK")
-    fill:SetAllPoints()
-    fill:SetColorTexture(1, 1, 1, 0.65)
-    table.insert(flash.regions, fill)
+    flash.icon = flash:CreateTexture(nil, "BACKGROUND")
+    flash.icon:SetAllPoints()
+    flash.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    flash.icon:Hide()
+    flash.glow = CreateFrame("Frame", nil, flash)
+    flash.glow:SetAllPoints()
+    flash.glow:EnableMouse(false)
+    flash.fill = flash.glow:CreateTexture(nil, "ARTWORK")
+    flash.fill:SetAllPoints()
+    table.insert(flash.regions, flash.fill)
     for _, edge in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
-        local line = flash:CreateTexture(nil, "OVERLAY")
+        local line = flash.glow:CreateTexture(nil, "OVERLAY")
         line:SetColorTexture(1, 1, 1, 1)
         if edge == "TOP" or edge == "BOTTOM" then
             line:SetPoint(edge .. "LEFT", -2, edge == "TOP" and 2 or -2)
@@ -145,10 +157,18 @@ function FSC:CreateReadyFlash(entry)
         alpha:SetToAlpha(step[2])
         alpha:SetDuration(step[3])
     end
-    animation:SetScript("OnFinished", function() FSC:StopReadyFlash(entry) end)
+    animation:SetScript("OnFinished", function()
+        self:StopReadyFlashEffect(frame)
+        if onFinished then onFinished() end
+    end)
+end
+
+function FSC:CreateReadyFlash(entry)
+    local frame = self.frames[entry.uid]
+    self:CreateReadyFlashEffect(frame, UIParent)
     local function Done(cooldown) FSC:OnCooldownReady(entry, cooldown) end
     frame.cooldown:SetScript("OnCooldownDone", Done)
     frame.chargeCooldown:SetScript("OnCooldownDone", Done)
-    frame:SetScript("OnHide", function() FSC:StopReadyFlash(entry, true) end)
+    frame:SetScript("OnHide", function() FSC:StopReadyFlash(entry) end)
 end
 

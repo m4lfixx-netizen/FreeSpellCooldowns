@@ -1,6 +1,7 @@
 local _, FSC = ...
 
-local layoutFields = { "x", "y", "size", "opacity", "combatOnly", "showNumbers", "showName", "flashReady", "flashIntensity", "manaTint" }
+local layoutFields = { "x", "y", "size", "opacity", "combatOnly", "showNumbers", "showName",
+    "flashReady", "flashOnly", "flashOutsideCombat", "flashIntensity", "manaTint" }
 
 local function ReadNumber(getter)
     if type(getter) ~= "function" then return end
@@ -32,6 +33,8 @@ local function NormaliseLayout(layout, fallback)
         showNumbers = layout.showNumbers ~= false,
         showName = layout.showName == true,
         flashReady = layout.flashReady == true,
+        flashOnly = layout.flashOnly == true,
+        flashOutsideCombat = layout.flashOutsideCombat == true,
         flashIntensity = FSC:Clamp(math.floor(Number("flashIntensity", 80) + 0.5), 0, 100),
         manaTint = layout.manaTint == true,
     }
@@ -42,7 +45,7 @@ function FSC:ReadTalentProfile()
     local group = ReadNumber(specialization.GetActiveSpecGroup)
         or ReadNumber(specialization.GetActiveTalentGroup)
         or ReadNumber(GetActiveTalentGroup) or ReadNumber(GetActiveSpecGroup)
-    if group == 1 or group == 2 then return "group:" .. group, "Talenty " .. group end
+    if group == 1 or group == 2 then return "group:" .. group, FSC:T("Talenty ") .. group end
     local configID = ReadNumber(C_ClassTalents and C_ClassTalents.GetActiveConfigID)
     if configID then
         local name
@@ -86,7 +89,7 @@ function FSC:IsEntryAssigned(entry, slot)
 end
 
 function FSC:GetSpecSummary(entry)
-    if entry.specs[1] and entry.specs[2] then return "oba specy" end
+    if entry.specs[1] and entry.specs[2] then return FSC:T("oba specy") end
     if entry.specs[1] then return "spec 1" end
     if entry.specs[2] then return "spec 2" end
     return "vypnuto"
@@ -279,7 +282,7 @@ function FSC:CheckTalentProfile()
     self:UpdateInteraction()
     self:RefreshOptions()
     self:QueueUpdate()
-    self:Status("Aktivní " .. self:GetSpecLabel(slot) .. ". Zobrazení kouzel určují zaškrtávátka.")
+    self:Status(FSC:T("Aktivní ") .. self:GetSpecLabel(slot) .. FSC:T(". Zobrazení kouzel určují zaškrtávátka."))
     return true
 end
 

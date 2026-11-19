@@ -170,7 +170,7 @@ function FSC:SetBuffLocked(locked)
     if not locked and not self.db.locked then self:SetLocked(true) end
     self.storage.buffProfiles[self.activeSpec or 1].locked = locked == true
     self:UpdateAllBuffs(); self:RefreshBuffOptions()
-    self:Status(locked and "Buffy a procy uzamčeny." or "Náhled vybraného buffu odemčen. Přesuň ho za tyrkysový rámeček.")
+    self:Status(locked and FSC:T("Buffy a procy uzamčeny.") or FSC:T("Náhled vybraného buffu odemčen. Přesuň ho za tyrkysový rámeček."))
 end
 
 function FSC:StartBuffPreview(entry)
@@ -238,8 +238,8 @@ function FSC:AddBuff(identifier, fromLoad)
         if type(requested) == "number" and requested > 0 and not fromLoad and C_Spell.RequestLoadSpellData then
             self.pendingBuffs[requested] = true
             C_Spell.RequestLoadSpellData(requested)
-            self:Status("Načítám údaje o buffu…")
-        else self:Status("Buff nenalezen. Zadej název aktivního buffu nebo jeho aura spell ID.", true) end
+            self:Status(FSC:T("Načítám údaje o buffu…"))
+        else self:Status(FSC:T("Buff nenalezen. Zadej název aktivního buffu nebo jeho aura spell ID."), true) end
         return false
     end
     for _, entry in ipairs(self.storage.buffs) do
@@ -247,7 +247,7 @@ function FSC:AddBuff(identifier, fromLoad)
             self.selectedBuffUID = entry.uid
             self:UpdateAllBuffs()
             self:RefreshBuffOptions()
-            self:Status("Tento buff už sleduješ: " .. entry.name)
+            self:Status(FSC:T("Tento buff už sleduješ: ") .. entry.name)
             return true
         end
     end
@@ -262,7 +262,7 @@ function FSC:AddBuff(identifier, fromLoad)
     self:CreateBuffFrame(entry)
     self:UpdateAllBuffs()
     self:RefreshBuffOptions()
-    self:Status("Přidán buff: " .. entry.name .. ". Odemkni ikony pro náhled a přesun.")
+    self:Status(FSC:T("Přidán buff: ") .. entry.name .. FSC:T(". Odemkni ikony pro náhled a přesun."))
     return true
 end
 
@@ -282,7 +282,7 @@ function FSC:AddMaelstromPreset(fromLoad)
     layout.showStacks, layout.showDuration = true, false
     self.buffPreviewStacks = 5
     self:ApplyBuff(entry); self:RefreshBuffOptions()
-    self:Status("Maelstrom Weapon: elektrické oblouky sílí od 1 do 5 stacků. Při 5 září naplno.")
+    self:Status(FSC:T("Maelstrom Weapon: elektrické oblouky sílí od 1 do 5 stacků. Při 5 září naplno."))
     return true
 end
 
@@ -311,7 +311,7 @@ function FSC:RemoveBuff(uid)
     self.selectedBuffUID = self.storage.buffs[1] and self.storage.buffs[1].uid
     self:UpdateAllBuffs()
     self:RefreshBuffOptions()
-    self:Status("Odebrán buff: " .. entry.name)
+    self:Status(FSC:T("Odebrán buff: ") .. entry.name)
 end
 
 function FSC:SetBuffSpec(entry, slot, enabled)
@@ -334,11 +334,11 @@ function FSC:BuildBuffContainer(entry, layout, frame)
     if not self.buffAuraSupported then return end
     local parts = self:GetBuffStackMode(layout) == "parts"
     if parts and not self.buffPartsSupported then
-        frame.nativeError = "Klient nepodporuje zobrazení motivu po částech. Vyber Celý motiv nebo Zesilování."
+        frame.nativeError = FSC:T("Klient nepodporuje zobrazení motivu po částech. Vyber Celý motiv nebo Zesilování.")
         return
     end
     if not parts and (layout.minStacks > 1 or layout.progressive or layout.glowAtMax) and not self.buffThresholdSupported then
-        frame.nativeError = "Klient nepodporuje pravidla stacků. Vypni zesilování a záři, práh nastav na 1."
+        frame.nativeError = FSC:T("Klient nepodporuje pravidla stacků. Vypni zesilování a záři, práh nastav na 1.")
         return
     end
     local slot = self.activeSpec or 1
@@ -477,7 +477,7 @@ function FSC:BuildBuffContainer(entry, layout, frame)
                 end
             end,
         })
-        if not ok then frame.nativeError = "Buff se nepodařilo vykreslit: " .. tostring(err); group.failed = true end
+        if not ok then frame.nativeError = FSC:T("Buff se nepodařilo vykreslit: ") .. tostring(err); group.failed = true end
     end
     local function Visual(threshold, alpha, glow, timeFloor)
         if style == "lightning" then
@@ -509,7 +509,7 @@ function FSC:BuildBuffContainer(entry, layout, frame)
         end
     else Visual(minimum > 1 and minimum or nil, 1, false) end
     if layout.glowAtMax and self.buffThresholdSupported then Visual(maximum, 0.45, true)
-    elseif layout.glowAtMax and parts then frame.nativeError = "Postupné části fungují; dodatečnou záři tento klient nepodporuje." end
+    elseif layout.glowAtMax and parts then frame.nativeError = FSC:T("Postupné části fungují; dodatečnou záři tento klient nepodporuje.") end
     if layout.flashAtMax or layout.pulseAtMax then
         if self.buffThresholdSupported then
             -- Non-stacking procs may report applications=0. Their aura button's
@@ -521,7 +521,7 @@ function FSC:BuildBuffContainer(entry, layout, frame)
                     if style == "lightning" then Layer(alertThreshold, 1, 1, true, false, false, nil, mode) end
                 end
             end
-        else frame.nativeError = "Tento klient nepodporuje blikání ani pulzování při maximu. Běžný motiv funguje dál." end
+        else frame.nativeError = FSC:T("Tento klient nepodporuje blikání ani pulzování při maximu. Běžný motiv funguje dál.") end
     end
     if layout.showStacks or (layout.showDuration and minimum == 1 and not overlay) then Layer(nil, 1, 0, false, true) end
     if group.failed then EnableGroup(group, false); return end
@@ -595,7 +595,7 @@ function FSC:ApplyBuff(entry)
     local assigned = entry.specs[self.activeSpec or 1] == true
     local visible = preview or (assigned and (not layout.combatOnly or InCombatLockdown()))
     frame:SetFrameStrata(preview and "TOOLTIP" or "MEDIUM")
-    frame.previewTitle:SetText("NÁHLED: " .. entry.name .. (not assigned and " (v tomto specu vypnuto)" or ""))
+    frame.previewTitle:SetText(FSC:T("NÁHLED: ") .. entry.name .. (not assigned and FSC:T(" (v tomto specu vypnuto)") or ""))
     frame:SetShown(visible)
     frame.preview:SetShown(preview and visible)
     frame.previewLabel:SetShown(preview and visible)
@@ -802,7 +802,7 @@ events:SetScript("OnEvent", function(_, event, id, success)
         if success then
             if id == 408505 and FSC.pendingMaelstromPreset then FSC:AddMaelstromPreset(true)
             else FSC:AddBuff(id, true) end
-        else FSC.pendingMaelstromPreset = nil; FSC:Status("Údaje o buffu se nepodařilo načíst.", true) end
+        else FSC.pendingMaelstromPreset = nil; FSC:Status(FSC:T("Údaje o buffu se nepodařilo načíst."), true) end
     elseif event == "PLAYER_REGEN_ENABLED" then
         local pending = FSC.pendingBuffs; FSC.pendingBuffs = {}
         for spellID in pairs(pending) do

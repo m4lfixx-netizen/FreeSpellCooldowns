@@ -8,13 +8,8 @@ local function DisplayBoolean(value)
     return (issecretvalue and issecretvalue(value)) or type(value) == "boolean"
 end
 
-function FSC:UpdateRange(entry)
-    local frame = self.frames[entry.uid]
-    if not frame then return end
-    local id = entry.activeSpellID or entry.spellID
-    local rangeOK, inRange
-    if C_Spell.IsSpellInRange then rangeOK, inRange = pcall(C_Spell.IsSpellInRange, id, "target") end
-    local hasRange = rangeOK and DisplayBoolean(inRange)
+function FSC:PaintIconAvailability(frame, inRange, insufficientPower)
+    local hasRange = DisplayBoolean(inRange)
     if hasRange then
         frame.texture:SetVertexColorFromBoolean(inRange, normal, outside)
     else
@@ -25,15 +20,29 @@ function FSC:UpdateRange(entry)
     -- option is turned off, so a prior blue tint can never stick.
     frame.manaTexture:SetVertexColor(1, 1, 1, 0)
     frame.manaLayer:SetAlpha(1)
-    if not entry.manaTint or not C_Spell.IsSpellUsable then return end
-    local powerOK, _, insufficientPower = pcall(C_Spell.IsSpellUsable, id)
-    if not powerOK or not DisplayBoolean(insufficientPower) then return end
+    if not DisplayBoolean(insufficientPower) then return end
     frame.manaTexture:SetVertexColorFromBoolean(insufficientPower, noMana, transparent)
     if hasRange then
         -- These are two independent native masks: insufficient power chooses
         -- the blue texture's alpha, range chooses its parent's alpha.
         frame.manaLayer:SetAlphaFromBoolean(inRange, 1, 0)
     end
+end
+
+function FSC:UpdateRange(entry)
+    local frame = self.frames[entry.uid]
+    if not frame then return end
+    local id = entry.activeSpellID or entry.spellID
+    local inRange, insufficientPower
+    if C_Spell.IsSpellInRange then
+        local ok, value = pcall(C_Spell.IsSpellInRange, id, "target")
+        if ok then inRange = value end
+    end
+    if entry.manaTint and C_Spell.IsSpellUsable then
+        local ok, _, value = pcall(C_Spell.IsSpellUsable, id)
+        if ok then insufficientPower = value end
+    end
+    self:PaintIconAvailability(frame, inRange, insufficientPower)
 end
 
 function FSC:UpdateAllRanges()

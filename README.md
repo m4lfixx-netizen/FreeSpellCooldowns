@@ -5,13 +5,16 @@ customizable visual alerts, stack tracking, and separate settings for each
 specialization.
 
 This addon targets **World of Warcraft Forever 1.60.1 (Interface 16001)**.
-This repository contains version **1.12.0**. Its configuration interface is in Czech. Compatibility with other WoW
-clients is not verified.
+This repository contains version **1.16.2**. Settings are available in Czech and English.
+Choose a language in `/fsc`, then confirm the interface reload. Compatibility with
+other WoW clients is not verified.
 
 ## Features
 
-- Place and resize each cooldown icon independently; enter exact pixel positions.
+- Place and resize each cooldown icon independently. Enter the position and size in pixels,
+  or hold the size controls to resize continuously.
 - Customize opacity, combat visibility, range and mana colors, and ready flashes.
+- Show an icon only when its cooldown finishes, and test cooldowns, charges, and flashes in the preview.
 - Track buffs and procs using an icon, a left/right pair, or a top motif.
 - Choose lightning, fire, frost, nature, or paladin artwork.
 - Show optional stack numbers, progressive intensity, or cumulative artwork pieces.

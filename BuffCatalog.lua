@@ -130,7 +130,7 @@ function FSC:RefreshBuffCatalog()
             filtered[#filtered + 1] = choice
         end
     end
-    window.caption:SetText("Classa: " .. self.buffCatalogClassName .. " — buffy v nabídce: " .. #filtered)
+    window.caption:SetText(FSC:T("Classa: ") .. self.buffCatalogClassName .. FSC:T(" — buffy v nabídce: ") .. #filtered)
     window.content:SetHeight(math.max(1, #filtered * 40))
     window.empty:SetShown(#filtered == 0)
     for index, choice in ipairs(filtered) do
@@ -143,11 +143,11 @@ function FSC:RefreshBuffCatalog()
             row.icon = row:CreateTexture(nil, "ARTWORK"); row.icon:SetSize(28, 28); row.icon:SetPoint("LEFT", 6, 0)
             row.name = UI.Label(row, "", 43, -5, "GameFontHighlightSmall"); row.name:SetWidth(330)
             row.detail = UI.Label(row, "", 43, -22, "GameFontDisableSmall")
-            row.add = UI.Button(row, "Vybrat", 386, -6, 78, function() FSC:AddBuffChoice(row.choice) end)
+            row.add = UI.Button(row, FSC:T("Vybrat"), 386, -6, 78, function() FSC:AddBuffChoice(row.choice) end)
             row:SetScript("OnClick", function() FSC:AddBuffChoice(row.choice) end)
         end
         row.choice = choice; row.icon:SetTexture(choice.iconID or 134400); row.name:SetText(choice.name)
-        row.detail:SetText(self:FindBuffChoice(choice) and "Už sleduješ — upravit" or "Přidat do sledovaných buffů")
+        row.detail:SetText(self:FindBuffChoice(choice) and FSC:T("Už sleduješ — upravit") or FSC:T("Přidat do sledovaných buffů"))
         row:Show()
     end
     for index = #filtered + 1, #window.rows do window.rows[index]:Hide() end
@@ -168,18 +168,18 @@ function FSC:OpenBuffCatalog()
         table.insert(UISpecialFrames, "FreeSpellCooldownsBuffCatalog")
         local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
         close:SetPoint("TOPRIGHT", -3, -3); close:SetScript("OnClick", function() window:Hide() end)
-        UI.Label(window, "Vyber buff k zobrazení", 20, -18, "GameFontNormalLarge")
+        UI.Label(window, FSC:T("Vyber buff k zobrazení"), 20, -18, "GameFontNormalLarge")
         window.caption = UI.Label(window, "", 20, -49, "GameFontHighlightSmall")
-        UI.Label(window, "Hledat:", 20, -87, "GameFontHighlightSmall")
+        UI.Label(window, FSC:T("Hledat:"), 20, -87, "GameFontHighlightSmall")
         window.search = UI.EditBox(window, 85, -79, 285)
         window.search:SetScript("OnTextChanged", function() FSC:RefreshBuffCatalog() end)
         window:SetScript("OnHide", function() window.search:ClearFocus() end)
-        window.refreshButton = UI.Button(window, "Obnovit", 395, -80, 110, function() FSC:ScanOwnBuffCatalog(); FSC:RefreshBuffCatalog() end)
+        window.refreshButton = UI.Button(window, FSC:T("Obnovit"), 395, -80, 110, function() FSC:ScanOwnBuffCatalog(); FSC:RefreshBuffCatalog() end)
         local scroll = CreateFrame("ScrollFrame", nil, window, "UIPanelScrollFrameTemplate")
         scroll:SetPoint("TOPLEFT", 20, -122); scroll:SetSize(480, 300)
         window.content = CreateFrame("Frame", nil, scroll); window.content:SetSize(480, 1); scroll:SetScrollChild(window.content)
-        window.empty = UI.Label(window.content, "Zatím žádný buff. Zkus Obnovit nebo ruční název / ID.", 5, -10, "GameFontDisable")
-        local hint = UI.Label(window, "Základní nabídka pro classu + další vlastní buffy poznané mimo boj.\nRuční přidání podle názvu nebo ID dál funguje.", 20, -446, "GameFontHighlightSmall")
+        window.empty = UI.Label(window.content, FSC:T("Zatím žádný buff. Zkus Obnovit nebo ruční název / ID."), 5, -10, "GameFontDisable")
+        local hint = UI.Label(window, FSC:T("Základní nabídka pro classu + další vlastní buffy poznané mimo boj.\nRuční přidání podle názvu nebo ID dál funguje."), 20, -446, "GameFontHighlightSmall")
         hint:SetWidth(505); hint:SetHeight(36); hint:SetJustifyV("TOP")
         window.rows = {}
     end
@@ -189,9 +189,9 @@ end
 local initializeBuffs = FSC.InitializeBuffs
 function FSC:InitializeBuffs()
     initializeBuffs(self)
-    local name, class = "Postava", "UNKNOWN"
+    local name, class = FSC:T("Postava"), "UNKNOWN"
     if UnitClass then name, class = UnitClass("player") end
-    self.buffCatalogClass, self.buffCatalogClassName = class or "UNKNOWN", name or "Postava"
+    self.buffCatalogClass, self.buffCatalogClassName = class or "UNKNOWN", name or FSC:T("Postava")
     self.storage.buffCatalog = type(self.storage.buffCatalog) == "table" and self.storage.buffCatalog or {}
     self.storage.buffCatalog[self.buffCatalogClass] = type(self.storage.buffCatalog[self.buffCatalogClass]) == "table"
         and self.storage.buffCatalog[self.buffCatalogClass] or {}

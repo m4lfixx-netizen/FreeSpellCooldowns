@@ -68,34 +68,34 @@ function FSC:PlayBuffSound(entry, preview)
     self.buffSoundFailures[entry.uid] = (not ok or success ~= true) and true or nil
     if preview then self.buffSoundPreviewHandle = ok and success and handle or nil end
     if preview then
-        self:Status(ok and success == true and ("Ukázka zvuku: " .. sound.name)
-            or "Zvuk se nepodařilo spustit. Zkontroluj zvuk hry a zkus Poslechnout znovu.", not (ok and success == true))
+        self:Status(ok and success == true and (FSC:T("Ukázka zvuku: ") .. self:T(sound.name))
+            or FSC:T("Zvuk se nepodařilo spustit. Zkontroluj zvuk hry a zkus Poslechnout znovu."), not (ok and success == true))
         self:RefreshBuffOptions()
     end
     return ok and success == true
 end
 
 function FSC:GetBuffSoundStatus(entry)
-    if not entry then return "Vyber buff. Tlačítko Poslechnout vyzkouší zvuk i při vypnutém upozornění." end
+    if not entry then return FSC:T("Vyber buff. Tlačítko Poslechnout vyzkouší zvuk i při vypnutém upozornění.") end
     local layout = self:BuffLayout(entry)
     if self.buffSoundFailures[entry.uid] then
-        return "Zvuk se nepodařilo spustit. Ověř zvuk hry a zkus Poslechnout. Výběr zvuku se neztratil."
+        return FSC:T("Zvuk se nepodařilo spustit. Ověř zvuk hry a zkus Poslechnout. Výběr zvuku se neztratil.")
     end
-    if not layout.soundEnabled then return "Zvuk je vypnutý. Zapni Zapnout zvuk. Poslechnout přehraje pouze ukázku." end
-    if not entry.specs[self.activeSpec or 1] then return "Buff je v aktivním specu vypnutý; skutečné zvukové upozornění neběží." end
-    if self:IsBuffPreview(entry) then return "Právě upravuješ náhled. Pro skutečné procy zamkni náhled; zvuk samostatně vyzkoušíš tlačítkem Poslechnout." end
+    if not layout.soundEnabled then return FSC:T("Zvuk je vypnutý. Zapni Zapnout zvuk. Poslechnout přehraje pouze ukázku.") end
+    if not entry.specs[self.activeSpec or 1] then return FSC:T("Buff je v aktivním specu vypnutý; skutečné zvukové upozornění neběží.") end
+    if self:IsBuffPreview(entry) then return FSC:T("Právě upravuješ náhled. Pro skutečné procy zamkni náhled; zvuk samostatně vyzkoušíš tlačítkem Poslechnout.") end
     local threshold = layout.soundAtMax and layout.maxStacks or layout.soundStacks
     if self:ReadMaelstromSoundSignal(entry, threshold) ~= nil then
-        return "Maelstrom, 5 stacků: zvuk sleduje okamžitý Blesk bez many. Zazní jednou při plném nabití a znovu po spotřebování a dalším nabití."
+        return FSC:T("Maelstrom, 5 stacků: zvuk sleduje okamžitý Blesk bez many. Zazní jednou při plném nabití a znovu po spotřebování a dalším nabití.")
     end
     if not self:IsBuffSoundReadable(entry) or (self.buffSoundStates[entry.uid] or {}).restricted then
-        return "Hra nyní skrývá stacky tohoto buffu. Přesný zvukový práh je nedostupný; ukázka zvuku funguje nezávisle."
+        return FSC:T("Hra nyní skrývá stacky tohoto buffu. Přesný zvukový práh je nedostupný; ukázka zvuku funguje nezávisle.")
     end
     if self.buffSoundRestrictedInCombat[entry.uid] then
-        return "V posledním boji hra skryla stacky a automatický zvukový práh byl nedostupný. Přehrát ukázku zkouší pouze zvuk, ne dostupnost prahu."
+        return FSC:T("V posledním boji hra skryla stacky a automatický zvukový práh byl nedostupný. Přehrát ukázku zkouší pouze zvuk, ne dostupnost prahu.")
     end
-    if layout.combatOnly and not InCombatLockdown() then return "Zvuk čeká na boj, protože je zapnutá volba Pouze v boji." end
-    return "Nastavený práh: " .. threshold .. " stacků. Automatický zvuk vyžaduje dostupné stacky; mimo boj nelze potvrdit jejich dostupnost pro příští boj."
+    if layout.combatOnly and not InCombatLockdown() then return FSC:T("Zvuk čeká na boj, protože je zapnutá volba Pouze v boji.") end
+    return FSC:T("Nastavený práh: ") .. threshold .. FSC:T(" stacků. Automatický zvuk vyžaduje dostupné stacky; mimo boj nelze potvrdit jejich dostupnost pro příští boj.")
 end
 
 function FSC:ResetBuffSound(entry)

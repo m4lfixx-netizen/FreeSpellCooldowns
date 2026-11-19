@@ -48,11 +48,30 @@ function FSC:UpdateAllCooldowns()
     end
 end
 
+function FSC:GetCooldownIconVisibility(entry, inCombat)
+    local drawIcon = not entry.flashOnly and (not entry.combatOnly or inCombat)
+    local trackCooldown = drawIcon or entry.flashOnly or (entry.flashReady and entry.flashOutsideCombat)
+    return trackCooldown, drawIcon
+end
+
+function FSC:SetCooldownIconDrawing(frame, entry, drawIcon)
+    -- A transparent frame keeps receiving native cooldown completion events.
+    -- The alert has its own frame, so its opacity is independent of this icon.
+    frame.fscDrawIcon = drawIcon
+    frame:SetAlpha(drawIcon and (entry.opacity or 1) or 0)
+end
+
 function FSC:ApplyVisibility(entry)
     local frame = self.frames[entry.uid]
-    if frame then
-        frame:SetShown(self:IsEntryAssigned(entry) and (not entry.combatOnly or InCombatLockdown()))
-    end
+    if not frame then return end
+    local trackCooldown, drawIcon = self:GetCooldownIconVisibility(entry, self.inCombat)
+    local assigned = self:IsEntryAssigned(entry)
+    local editable = not self.db.locked and not self.inCombat
+    drawIcon = assigned and (drawIcon or (editable and entry.flashOnly))
+    self:SetCooldownIconDrawing(frame, entry, drawIcon)
+    frame:SetShown(assigned and trackCooldown)
+    frame:EnableMouse(editable and drawIcon)
+    frame:EnableMouseWheel(editable and drawIcon)
 end
 
 function FSC:SavePosition(entry)
@@ -70,14 +89,11 @@ function FSC:SavePosition(entry)
 end
 
 function FSC:UpdateInteraction()
-    local editable = not self.db.locked and not InCombatLockdown()
+    local editable = not self.db.locked and not self.inCombat
     for _, entry in ipairs(self.db.icons) do
         local frame = self.frames[entry.uid]
         if frame then
             if not editable then self:SavePosition(entry) end
-            local assigned = self:IsEntryAssigned(entry)
-            frame:EnableMouse(editable and assigned)
-            frame:EnableMouseWheel(editable and assigned)
             frame.border:SetColorTexture(editable and 0.2 or 0.06,
                 editable and 0.85 or 0.06, editable and 0.8 or 0.06, 1)
             self:ApplyVisibility(entry)
@@ -87,17 +103,8 @@ function FSC:UpdateInteraction()
     end
 end
 
-function FSC:ApplyIcon(entry)
-    local frame = self.frames[entry.uid]
-    if not frame then return end
-    local halfWidth = math.max(0, (UIParent:GetWidth() - entry.size) / 2 - 2)
-    local halfHeight = math.max(0, (UIParent:GetHeight() - entry.size) / 2 - 18)
-    entry.x = self:Clamp(entry.x, -halfWidth, halfWidth)
-    entry.y = self:Clamp(entry.y, -halfHeight, halfHeight)
+function FSC:ApplyIconAppearance(frame, entry)
     frame:SetSize(entry.size, entry.size)
-    frame:SetAlpha(entry.opacity or 1)
-    frame:ClearAllPoints()
-    frame:SetPoint("CENTER", UIParent, "CENTER", entry.x, entry.y)
     frame.texture:SetTexture(entry.iconID or 134400)
     frame.manaTexture:SetTexture(entry.iconID or 134400)
     frame.label:SetText(entry.name)
@@ -106,27 +113,39 @@ function FSC:ApplyIcon(entry)
     frame.cooldown:SetHideCountdownNumbers(not entry.showNumbers)
     StyleCountdown(frame.cooldown, entry.size)
     frame.count:SetFont(STANDARD_TEXT_FONT, math.max(10, math.floor(entry.size * 0.24)), "OUTLINE")
+end
+
+function FSC:ApplyIcon(entry)
+    local frame = self.frames[entry.uid]
+    if not frame then return end
+    local halfWidth = math.max(0, (UIParent:GetWidth() - entry.size) / 2 - 2)
+    local halfHeight = math.max(0, (UIParent:GetHeight() - entry.size) / 2 - 18)
+    entry.x = self:Clamp(entry.x, -halfWidth, halfWidth)
+    entry.y = self:Clamp(entry.y, -halfHeight, halfHeight)
+    self:ApplyIconAppearance(frame, entry)
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", UIParent, "CENTER", entry.x, entry.y)
     self:ApplyVisibility(entry)
     self:SyncReadyFlash(entry)
     self:SaveEntrySettings(entry)
     self:UpdateRange(entry)
 end
 
+function FSC:ClampIconSize(size)
+    return self:Clamp(math.floor(size + 0.5), 24, 160)
+end
+
 function FSC:ResizeIcon(entry, size)
     if not self:CanEdit() then return end
-    entry.size = self:Clamp(math.floor(size + 0.5), 24, 160)
+    size = self:ClampIconSize(size)
+    if entry.size == size then return end
+    entry.size = size
     self:ApplyIcon(entry)
     self:RefreshOptions()
 end
 
-function FSC:CreateIcon(entry)
-    local frame = CreateFrame("Button", nil, UIParent)
-    self.frames[entry.uid] = frame
-    frame:SetFrameStrata("MEDIUM")
-    frame:SetMovable(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:RegisterForClicks("RightButtonUp")
+function FSC:CreateCooldownIconFrame(parent)
+    local frame = CreateFrame("Button", nil, parent)
     frame.border = frame:CreateTexture(nil, "BACKGROUND")
     frame.border:SetPoint("TOPLEFT", -2, 2)
     frame.border:SetPoint("BOTTOMRIGHT", 2, -2)
@@ -174,6 +193,17 @@ function FSC:CreateIcon(entry)
     self:SetCzechFont(frame.label)
     frame.label:SetPoint("TOP", frame, "BOTTOM", 0, -4)
     frame.label:SetTextColor(1, 1, 1)
+    return frame
+end
+
+function FSC:CreateIcon(entry)
+    local frame = self:CreateCooldownIconFrame(UIParent)
+    self.frames[entry.uid] = frame
+    frame:SetFrameStrata("MEDIUM")
+    frame:SetMovable(true)
+    frame:SetClampedToScreen(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:RegisterForClicks("RightButtonUp")
     self:CreateReadyFlash(entry)
 
     frame:SetScript("OnDragStart", function()
@@ -200,8 +230,8 @@ function FSC:CreateIcon(entry)
         local tooltip = FSC:GetTooltip()
         tooltip:SetOwner(frame, "ANCHOR_RIGHT")
         tooltip:SetSpellByID(entry.activeSpellID or entry.spellID)
-        tooltip:AddLine("Přetáhni: pozice  |  Shift + kolečko: velikost", 0.4, 0.9, 0.85)
-        tooltip:AddLine("Pravé tlačítko: nastavení této ikony", 0.4, 0.9, 0.85)
+        tooltip:AddLine(FSC:T("Přetáhni: pozice  |  Shift + kolečko: velikost"), 0.4, 0.9, 0.85)
+        tooltip:AddLine(FSC:T("Pravé tlačítko: nastavení této ikony"), 0.4, 0.9, 0.85)
         FSC:StyleTooltip()
         tooltip:Show()
     end)

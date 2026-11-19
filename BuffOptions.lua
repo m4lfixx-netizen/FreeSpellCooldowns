@@ -30,7 +30,7 @@ local function NumericBox(parent, x, y, width, apply)
             if value and value == value and value > -math.huge and value < math.huge then
                 apply(entry, FSC:BuffLayout(entry), value)
                 FSC:ApplyBuff(entry)
-            else FSC:Status("Zadej platné číslo.", true) end
+            else FSC:Status(FSC:T("Zadej platné číslo."), true) end
         end
         self.cancelled = nil
         FSC:RefreshBuffOptions()
@@ -80,7 +80,7 @@ local function ThemeCard(parent, x, themeKey, callback)
     card.anchor = CreateFrame("Frame", nil, card)
     card.anchor:SetSize(52, 38); card.anchor:SetPoint("TOP", card, "TOP", 0, -2)
     for index = 1, 2 do table.insert(card.art, card.anchor:CreateTexture(nil, "ARTWORK")) end
-    local label = UI.Label(card, FSC.buffThemes[themeKey].name, 0, 0, "GameFontHighlightSmall")
+    local label = UI.Label(card, FSC:T(FSC.buffThemes[themeKey].name), 0, 0, "GameFontHighlightSmall")
     label:ClearAllPoints(); label:SetPoint("BOTTOM", card, "BOTTOM", 0, 6)
     return card
 end
@@ -107,8 +107,8 @@ function FSC:ClearBuffFocus()
 end
 
 function FSC:AttachCategoryTabs(window, active)
-    local cooldowns = UI.Button(window, "Cooldowny", 650, -17, 145, function() FSC:OpenCooldownOptions() end)
-    local buffs = UI.Button(window, "Buffy / procy", 805, -17, 190, function() FSC:OpenBuffOptions() end)
+    local cooldowns = UI.Button(window, FSC:T("Cooldowny"), 650, -17, 145, function() FSC:OpenCooldownOptions() end)
+    local buffs = UI.Button(window, FSC:T("Buffy / procy"), 805, -17, 190, function() FSC:OpenBuffOptions() end)
     window.categoryTabs = {cooldowns = cooldowns, buffs = buffs}
     cooldowns:SetEnabled(active ~= "cooldowns")
     buffs:SetEnabled(active ~= "buffs")
@@ -117,12 +117,12 @@ end
 function FSC:RefreshBuffOptions()
     local window = self.buffOptions
     if not window or not self.storage then return end
-    window.profile:SetText("Aktivní " .. self:GetSpecLabel() .. " — vzhled se ukládá pro každý spec zvlášť")
-    window.lock:SetText(self:IsBuffLocked() and "Odemknout náhled buffu" or "Zamknout náhled buffu")
+    window.profile:SetText(FSC:T("Aktivní ") .. self:GetSpecLabel() .. FSC:T(" — vzhled se ukládá pro každý spec zvlášť"))
+    window.lock:SetText(self:IsBuffLocked() and FSC:T("Odemknout náhled buffu") or FSC:T("Zamknout náhled buffu"))
     if not self.selectedBuffUID or not self:FindBuff(self.selectedBuffUID) then
         self.selectedBuffUID = self.storage.buffs[1] and self.storage.buffs[1].uid
     end
-    window.listTitle:SetText("Sledované buffy (" .. #self.storage.buffs .. ")")
+    window.listTitle:SetText(FSC:T("Sledované buffy (") .. #self.storage.buffs .. ")")
     window.empty:SetShown(#self.storage.buffs == 0)
     window.content:SetHeight(math.max(1, #self.storage.buffs * 38))
     for index, entry in ipairs(self.storage.buffs) do
@@ -135,7 +135,7 @@ function FSC:RefreshBuffOptions()
             row.icon = row:CreateTexture(nil, "ARTWORK"); row.icon:SetSize(28, 28); row.icon:SetPoint("LEFT", 5, 0)
             row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             FSC:SetCzechFont(row.name); row.name:SetPoint("LEFT", 42, 0); row.name:SetWidth(184); row.name:SetJustifyH("LEFT")
-            row.remove = UI.Button(row, "×", 238, -5, 28, function() FSC:RemoveBuff(row.uid) end)
+            row.remove = UI.Button(row, FSC:T("×"), 238, -5, 28, function() FSC:RemoveBuff(row.uid) end)
             row:SetScript("OnClick", function()
                 FSC:ClearBuffFocus(); FSC:StartBuffPreview(FSC:FindBuff(row.uid))
             end)
@@ -143,19 +143,19 @@ function FSC:RefreshBuffOptions()
         row.uid = entry.uid; row.icon:SetTexture(entry.iconID)
         local layout = self:BuffLayout(entry)
         row.name:SetText(entry.name .. "  |cff999999" .. self:GetSpecSummary(entry)
-            .. (layout.minStacks > 1 and (", od " .. layout.minStacks .. " stacků") or "") .. "|r")
+            .. (layout.minStacks > 1 and (FSC:T(", od ") .. layout.minStacks .. FSC:T(" stacků")) or "") .. "|r")
         local active = entry.uid == self.selectedBuffUID
         row.background:SetColorTexture(active and 0.10 or 0.06, active and 0.28 or 0.07, active and 0.29 or 0.09, 0.95)
         row:SetAlpha(self:IsEntryAssigned(entry) and 1 or 0.5); row:Show()
     end
     for index = #self.storage.buffs + 1, #rows do rows[index]:Hide() end
     local entry, layout = Selected()
-    window.selected:SetText(entry and ("Vybraný buff: " .. entry.name) or "Nejdřív přidej buff")
+    window.selected:SetText(entry and (FSC:T("Vybraný buff: ") .. entry.name) or FSC:T("Nejdřív přidej buff"))
     for _, control in ipairs(window.controls) do control:SetEnabled(entry ~= nil) end
     window.spec1:SetChecked(entry and entry.specs[1] or false)
     window.spec2:SetChecked(entry and entry.specs[2] or false)
-    window.spec1.label:SetText("Spec 1" .. (self.activeSpec == 1 and " (aktivní)" or ""))
-    window.spec2.label:SetText("Spec 2" .. (self.activeSpec == 2 and " (aktivní)" or ""))
+    window.spec1.label:SetText("Spec 1" .. (self.activeSpec == 1 and FSC:T(" (aktivní)") or ""))
+    window.spec2.label:SetText("Spec 2" .. (self.activeSpec == 2 and FSC:T(" (aktivní)") or ""))
     window.stacks:SetChecked(layout and layout.showStacks or false)
     window.duration:SetChecked(layout and layout.showDuration or false)
     window.duration:SetEnabled(entry ~= nil and layout.minStacks == 1 and layout.style == "icon")
@@ -209,11 +209,11 @@ function FSC:RefreshBuffOptions()
     window.previewLess:SetEnabled(entry ~= nil and self:IsBuffPreview())
     window.previewMore:SetEnabled(entry ~= nil and self:IsBuffPreview())
     local error = entry and self.buffFrames[entry.uid] and self.buffFrames[entry.uid].nativeError
-    window.ruleHint:SetText(not self.buffAuraSupported and "Tento klient nepodporuje nativní sledování buffů."
-        or error or (alertEnabled and "Blikání = krátké záblesky; pulzování = plynulá záře. Obojí běží jen při maximu, i současně."
-        or (mode == "parts" and "Po částech: přibývá pět částí motivu, při maximu je celý. Vyzkoušej náhled stacků."
-        or (not self.buffThresholdSupported and "Práh stacků tento klient nepodporuje. Běžné zobrazení: od 1."
-        or "Zesilování: slabý efekt při nízkých stackách, plný při maximu. Odpočet: pouze ikona od 1 stacku."))))
+    window.ruleHint:SetText(not self.buffAuraSupported and FSC:T("Tento klient nepodporuje nativní sledování buffů.")
+        or error or (alertEnabled and FSC:T("Blikání = krátké záblesky; pulzování = plynulá záře. Obojí běží jen při maximu, i současně.")
+        or (mode == "parts" and FSC:T("Po částech: přibývá pět částí motivu, při maximu je celý. Vyzkoušej náhled stacků.")
+        or (not self.buffThresholdSupported and FSC:T("Práh stacků tento klient nepodporuje. Běžné zobrazení: od 1.")
+        or FSC:T("Zesilování: slabý efekt při nízkých stackách, plný při maximu. Odpočet: pouze ikona od 1 stacku.")))))
 end
 
 function FSC:CreateBuffOptions()
@@ -233,23 +233,23 @@ function FSC:CreateBuffOptions()
     close:SetPoint("TOPRIGHT", -3, -3); close:SetScript("OnClick", function() window:Hide() end)
     UI.Label(window, "Free Spell Cooldowns", 20, -19, "GameFontNormalLarge")
     self:AttachCategoryTabs(window, "buffs")
-    UI.Label(window, "Buffy a procy – ikony, boční dvojice nebo horní motiv.", 20, -48, "GameFontHighlightSmall")
+    UI.Label(window, FSC:T("Buffy a procy – ikony, boční dvojice nebo horní motiv."), 20, -48, "GameFontHighlightSmall")
     window.profile = UI.Label(window, "", 20, -70, "GameFontNormalSmall")
-    window.inputLabel = UI.Label(window, "Název buffu / aura spell ID:", 20, -100, "GameFontHighlightSmall")
+    window.inputLabel = UI.Label(window, FSC:T("Název buffu / aura spell ID:"), 20, -100, "GameFontHighlightSmall")
     window.input = UI.EditBox(window, 25, -120, 385)
     local function Add()
         if FSC:AddBuff(window.input:GetText()) then window.input:SetText(""); window.input:ClearFocus() end
     end
     window.input:SetScript("OnEnterPressed", Add)
-    window.addButton = UI.Button(window, "Přidat buff", 425, -121, 110, Add)
-    window.chooseBuff = UI.Button(window, "Vybrat buff pro moji classu…", 20, -160, 370, function() FSC:OpenBuffCatalog() end)
-    window.status = UI.Label(window, "Přidej buff a odemkni ikony pro náhled a přesun.", 20, -196, "GameFontHighlightSmall")
+    window.addButton = UI.Button(window, FSC:T("Přidat buff"), 425, -121, 110, Add)
+    window.chooseBuff = UI.Button(window, FSC:T("Vybrat buff pro moji classu…"), 20, -160, 370, function() FSC:OpenBuffCatalog() end)
+    window.status = UI.Label(window, FSC:T("Přidej buff a odemkni ikony pro náhled a přesun."), 20, -196, "GameFontHighlightSmall")
     window.status:SetWidth(515); window.status:SetHeight(30); window.status:SetJustifyV("TOP")
     window.listTitle = UI.Label(window, "", 20, -237, "GameFontNormalSmall")
     local scroll = CreateFrame("ScrollFrame", nil, window, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 20, -261); scroll:SetSize(490, 100)
     window.content = CreateFrame("Frame", nil, scroll); window.content:SetSize(490, 1); scroll:SetScrollChild(window.content)
-    window.empty = UI.Label(window.content, "Zatím nesleduješ žádné buffy.", 8, -10, "GameFontDisable")
+    window.empty = UI.Label(window.content, FSC:T("Zatím nesleduješ žádné buffy."), 8, -10, "GameFontDisable")
     window.selected = UI.Label(window, "", 20, -376, "GameFontNormal"); window.selected:SetWidth(510)
     window.spec1 = UI.CheckBox(window, "Spec 1", 20, -398, function(self)
         local entry = Selected(); if entry then FSC:SetBuffSpec(entry, 1, self:GetChecked()) end
@@ -269,11 +269,11 @@ function FSC:CreateBuffOptions()
             FSC:StartBuffPreview(entry)
         end
     end
-    window.iconStyle = StyleCard(window, 20, "icon", "Ikona buffu", function() Style("icon") end)
-    window.lightningStyle = StyleCard(window, 195, "lightning", "Vlevo + vpravo", function() Style("lightning") end)
-    window.topStyle = StyleCard(window, 370, "top", "Horní motiv", function() Style("top") end)
+    window.iconStyle = StyleCard(window, 20, "icon", FSC:T("Ikona buffu"), function() Style("icon") end)
+    window.lightningStyle = StyleCard(window, 195, "lightning", FSC:T("Vlevo + vpravo"), function() Style("lightning") end)
+    window.topStyle = StyleCard(window, 370, "top", FSC:T("Horní motiv"), function() Style("top") end)
     window.styleCards = { window.iconStyle, window.lightningStyle, window.topStyle }
-    window.themeLabel = UI.Label(window, "Motiv bočního a horního zobrazení:", 20, -537, "GameFontHighlightSmall")
+    window.themeLabel = UI.Label(window, FSC:T("Motiv bočního a horního zobrazení:"), 20, -537, "GameFontHighlightSmall")
     window.themeCards = {}
     for index, key in ipairs(FSC.buffThemeOrder) do
         local themeKey = key
@@ -286,10 +286,10 @@ function FSC:CreateBuffOptions()
             end
         end)
     end
-    window.minimumLabel = UI.Label(window, "Od stacku:", 20, -652, "GameFontHighlightSmall")
+    window.minimumLabel = UI.Label(window, FSC:T("Od stacku:"), 20, -652, "GameFontHighlightSmall")
     window.minimum = NumericBox(window, 110, -644, 65, function(_, layout, value)
         value = FSC:Clamp(math.floor(value + 0.5), 1, 40)
-        if value > 1 and not FSC.buffThresholdSupported and FSC:GetBuffStackMode(layout) ~= "parts" then FSC:Status("Klient nepodporuje nativní práh stacků.", true)
+        if value > 1 and not FSC.buffThresholdSupported and FSC:GetBuffStackMode(layout) ~= "parts" then FSC:Status(FSC:T("Klient nepodporuje nativní práh stacků."), true)
         else layout.minStacks = value; layout.maxStacks = math.max(value, layout.maxStacks) end
     end)
     window.maximumLabel = UI.Label(window, "Maximum:", 280, -652, "GameFontHighlightSmall")
@@ -308,7 +308,7 @@ function FSC:CreateBuffOptions()
         local entry, layout = Selected()
         if not layout then return end
         if mode == "parts" and (layout.style == "icon" or layout.maxStacks < 2 or not FSC.buffPartsSupported) then
-            FSC:Status("Po částech vyber u bočního nebo horního motivu s alespoň dvěma stacky.", true)
+            FSC:Status(FSC:T("Po částech vyber u bočního nebo horního motivu s alespoň dvěma stacky."), true)
             FSC:RefreshBuffOptions(); return
         end
         layout.progressive, layout.revealParts = mode == "opacity", mode == "parts"
@@ -318,16 +318,16 @@ function FSC:CreateBuffOptions()
             FSC:ApplyBuff(entry); FSC:RefreshBuffOptions()
         end
     end
-    window.fullMotif = UI.RadioButton(window, "Celý motiv", 20, -678, function() StackMode("full") end)
-    window.progressive = UI.RadioButton(window, "Zesilování", 195, -678, function() StackMode("opacity") end)
-    window.revealParts = UI.RadioButton(window, "Po částech", 370, -678, function() StackMode("parts") end)
-    window.glow = UI.CheckBox(window, "Zářit při maximu", 195, -713, function(self) Toggle("glowAtMax", self:GetChecked()) end)
-    window.stacks = UI.CheckBox(window, "Počet stacků", 20, -713, function(self)
+    window.fullMotif = UI.RadioButton(window, FSC:T("Celý motiv"), 20, -678, function() StackMode("full") end)
+    window.progressive = UI.RadioButton(window, FSC:T("Zesilování"), 195, -678, function() StackMode("opacity") end)
+    window.revealParts = UI.RadioButton(window, FSC:T("Po částech"), 370, -678, function() StackMode("parts") end)
+    window.glow = UI.CheckBox(window, FSC:T("Zářit při maximu"), 195, -713, function(self) Toggle("glowAtMax", self:GetChecked()) end)
+    window.stacks = UI.CheckBox(window, FSC:T("Počet stacků"), 20, -713, function(self)
         if not FSC:CanEdit() then return end
         local entry, layout = Selected()
         if layout then layout.showStacks = self:GetChecked() == true; FSC:ApplyBuff(entry) end
     end)
-    window.duration = UI.CheckBox(window, "Časový odpočet", 370, -713, function(self)
+    window.duration = UI.CheckBox(window, FSC:T("Časový odpočet"), 370, -713, function(self)
         if not FSC:CanEdit() then return end
         local entry, layout = Selected()
         if layout then layout.showDuration = self:GetChecked() == true; FSC:ApplyBuff(entry) end
@@ -339,9 +339,9 @@ function FSC:CreateBuffOptions()
         layout[field] = checked == true
         FSC:StartBuffPreview(entry)
     end
-    window.flashMax = UI.CheckBox(window, "Blikat při maximu", 20, -748, function(self) Alert("flashAtMax", self:GetChecked()) end)
-    window.pulseMax = UI.CheckBox(window, "Pulzovat při maximu", 270, -748, function(self) Alert("pulseAtMax", self:GetChecked()) end)
-    window.alertIntensityLabel = UI.Label(window, "Síla blikání/pulzů:", 20, -789, "GameFontHighlightSmall")
+    window.flashMax = UI.CheckBox(window, FSC:T("Blikat při maximu"), 20, -748, function(self) Alert("flashAtMax", self:GetChecked()) end)
+    window.pulseMax = UI.CheckBox(window, FSC:T("Pulzovat při maximu"), 270, -748, function(self) Alert("pulseAtMax", self:GetChecked()) end)
+    window.alertIntensityLabel = UI.Label(window, FSC:T("Síla blikání/pulzů:"), 20, -789, "GameFontHighlightSmall")
     window.alertIntensity = UI.PercentSlider(window, 145, -783, 180)
     window.alertValue = UI.Label(window, "", 345, -789, "GameFontHighlightSmall")
     window.alertIntensity:SetScript("OnValueChanged", function(_, value)
@@ -352,12 +352,12 @@ function FSC:CreateBuffOptions()
             FSC:ApplyBuff(entry); FSC:RefreshBuffOptions()
         end
     end)
-    window.alertPreview = UI.Button(window, "Náhled maxima", 410, -780, 125, function()
+    window.alertPreview = UI.Button(window, FSC:T("Náhled maxima"), 410, -780, 125, function()
         local entry = Selected(); if entry then FSC:StartBuffPreview(entry) end
     end)
     window.ruleHint = UI.Label(window, "", 20, -837, "GameFontHighlightSmall")
     window.ruleHint:SetWidth(515); window.ruleHint:SetHeight(30); window.ruleHint:SetJustifyV("TOP")
-    window.sizeLabel = UI.Label(window, "Velikost:", 20, -881, "GameFontHighlightSmall")
+    window.sizeLabel = UI.Label(window, FSC:T("Velikost:"), 20, -881, "GameFontHighlightSmall")
     local function Resize(delta)
         if not FSC:CanEdit() then return end
         local entry, layout = Selected()
@@ -370,12 +370,12 @@ function FSC:CreateBuffOptions()
     window.size = UI.Label(window, "", 125, -881, "GameFontHighlightSmall")
     local plus = UI.StepButton(window, 191, -873, true, function() Resize(1) end)
     window.sizeLess, window.sizeMore = minus, plus
-    window.combatOnly = UI.CheckBox(window, "Pouze v boji", 280, -868, function(self)
+    window.combatOnly = UI.CheckBox(window, FSC:T("Pouze v boji"), 280, -868, function(self)
         if not FSC:CanEdit() then return end
         local entry, layout = Selected()
         if layout then layout.combatOnly = self:GetChecked() == true; FSC:ApplyBuff(entry) end
     end)
-    window.opacityLabel = UI.Label(window, "Průhlednost:", 20, -920, "GameFontHighlightSmall")
+    window.opacityLabel = UI.Label(window, FSC:T("Průhlednost:"), 20, -920, "GameFontHighlightSmall")
     window.opacity = UI.PercentSlider(window, 110, -914, 200)
     window.opacityValue = UI.Label(window, "", 328, -920, "GameFontHighlightSmall")
     window.opacity:SetScript("OnValueChanged", function(_, value)
@@ -390,8 +390,8 @@ function FSC:CreateBuffOptions()
     window.x = NumericBox(window, 45, -952, 80, function(_, layout, value) layout.x = math.floor(value + 0.5) end)
     window.yLabel = UI.Label(window, "Y:", 195, -960, "GameFontHighlightSmall")
     window.y = NumericBox(window, 220, -952, 80, function(_, layout, value) layout.y = math.floor(value + 0.5) end)
-    window.positionUnit = UI.Label(window, "px od středu", 322, -960, "GameFontHighlightSmall")
-    window.previewStacksLabel = UI.Label(window, "Náhled stacků:", 20, -1003, "GameFontHighlightSmall")
+    window.positionUnit = UI.Label(window, FSC:T("px od středu"), 322, -960, "GameFontHighlightSmall")
+    window.previewStacksLabel = UI.Label(window, FSC:T("Náhled stacků:"), 20, -1003, "GameFontHighlightSmall")
     local function Preview(delta)
         local entry, layout = Selected()
         if layout and FSC:IsBuffPreview() then
@@ -402,19 +402,19 @@ function FSC:CreateBuffOptions()
     window.previewLess = UI.StepButton(window, 145, -995, false, function() Preview(-1) end)
     window.previewCount = UI.Label(window, "", 190, -1003, "GameFontHighlightSmall")
     window.previewMore = UI.StepButton(window, 230, -995, true, function() Preview(1) end)
-    window.previewHint = UI.Label(window, "Po odemčení", 280, -1003, "GameFontHighlightSmall")
+    window.previewHint = UI.Label(window, FSC:T("Po odemčení"), 280, -1003, "GameFontHighlightSmall")
     window.lock = UI.Button(window, "", 20, -1046, 210, function()
         if FSC:IsBuffLocked() then
             local entry = Selected(); if entry then FSC:StartBuffPreview(entry) end
         else FSC:SetBuffLocked(true) end
     end)
-    local center = UI.Button(window, "Přesunout na střed", 275, -1046, 235, function()
+    local center = UI.Button(window, FSC:T("Přesunout na střed"), 275, -1046, 235, function()
         if not FSC:CanEdit() then return end
         local entry, layout = Selected()
         if layout then layout.x, layout.y = 0, 0; FSC:ApplyBuff(entry); FSC:RefreshBuffOptions() end
     end)
     window.centerButton = center
-    local hint = UI.Label(window, "NÁHLED: přetažení = poloha, Shift + kolečko = velikost.\nŠedý motiv pomáhá s polohou i při průhlednosti 100 %.", 20, -1085, "GameFontHighlightSmall")
+    local hint = UI.Label(window, FSC:T("NÁHLED: přetažení = poloha, Shift + kolečko = velikost.\nŠedý motiv pomáhá s polohou i při průhlednosti 100 %."), 20, -1085, "GameFontHighlightSmall")
     window.previewInstructions = hint
     hint:SetWidth(520); hint:SetHeight(32); hint:SetJustifyV("TOP")
     window.controls = { window.spec1, window.spec2, window.minimum, window.maximum,

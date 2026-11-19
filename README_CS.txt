@@ -1,5 +1,41 @@
-FREE SPELL COOLDOWNS 1.12.0
+FREE SPELL COOLDOWNS 1.16.2
 Samostatné cooldowny a buffy/procy pro WoW Forever 1.60.1 (Interface 16001)
+
+NOVINKA 1.16.2 – ČESKÉ ZNAKY V POTVRZENÍ ZMĚNY JAZYKA
+- Text a tlačítka potvrzení používají font addonu s českou diakritikou.
+
+NOVINKY 1.16.1 – POTVRZENÍ JAZYKA A PŮVODNÍ VZHLED
+- Při volbě jiného jazyka se otevře potvrzení. Přepnout uloží jazyk
+  pro postavu a znovu načte herní rozhraní. Zrušit dialog zavře.
+- Okna mají původní tmavě modrý vzhled z verze 1.15.0.
+- Ve Vzhledu ikony můžeš napsat velikost 24–160 px a potvrdit Enterem.
+  Kliknutí na + nebo − změní velikost o 1 px. Podržení změnu opakuje.
+
+NOVINKY 1.15.0 – ČEŠTINA A ANGLIČTINA
+- Čeština / English je v horní části nastavení Cooldownů i Buffů a proců.
+  Volba se uloží pro postavu a následně se znovu načte herní rozhraní.
+- Jen probliknutí po nabití cooldownu ukazuje vybranou ikonu v Testu náhledu.
+  Test odpočtu a test nabíjení ukazují, kolik sekund ještě zbývá.
+- Průhlednost ve Vzhledu ikony platí i pro ikonu při záblesku. Sílu záře
+  můžeš měnit zvlášť v položce Intenzita záblesku.
+
+NOVINKY 1.14.0 – JEN PROBLIKNUTÍ PO COOLDOWNU
+- Pod Boj a upozornění můžeš u kouzla zapnout Jen probliknutí po nabití cooldownu.
+  Ikona se ukáže krátce po skončení cooldownu nebo doběhnutí nabíjení.
+- Velikost a polohu nastav ve Vzhledu ikony. Odemčenou ikonu jde přetáhnout
+  jako při běžném nastavování. Sílu záblesku nastav v Boji a upozornění.
+- Probliknout i mimo boj povolí upozornění při dokončení cooldownu mimo boj.
+- Test náhledu přehraje efekt samostatně nebo na konci testovacího odpočtu.
+
+NOVINKY 1.13.0 – ZÁLOŽKY COOLDOWNŮ A TEST NÁHLEDU
+- Vzhled ikony obsahuje velikost, text, průhlednost a polohu v pixelech.
+- Boj a upozornění obsahuje volbu Pouze v boji, zabarvení při nedostatku
+  many a záblesk po dokončení cooldownu včetně jeho intenzity.
+- Test náhledu umožní zkusit ikonu v okně i na uložené pozici, simulovat boj,
+  nedostatečný dosah či nedostatek many, spustit odpočet a nabíjení nebo
+  přehrát záblesk samostatně. Testovací stavy se neukládají.
+- Opravené Pouze v boji zobrazí ikonu hned při vstupu do boje a schová ji
+  po jeho skončení.
 
 NOVINKY 1.12.0 - PŘEHLEDNĚJŠÍ NASTAVENÍ, POSTUPNÉ ČÁSTI A ZVUK MAELSTROMU
 - Nastavení buffu má čtyři jednoznačné záložky: Vzhled, Stacky a zvuk,
